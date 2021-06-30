@@ -1,0 +1,101 @@
+
+
+#1: safecrash
+
+airdop to safemoon holders
+
+stake lp tokens to rebase cash
+  from others who dont stake
+
+when above a penny, you can crash it
+
+
+
+
+
+#2: Partial Ownership
+
+NFT is minted (can represent anything)
+can be taken by anyone from your wallet as
+  long as they pay a fee
+
+You can set a price that they cant take it unless
+  they payer higher than that fee
+  - you pay a flat annual 2% on that amount
+  - The token is untransferrable until you pay the interest.
+
+- reverse bondng curve
+
+- bundle a bond with purchase or mint
+
+
+let nft interest + bond and someone wants to claim it
+  stated price purchased
+
+
+
+- as long as there is a bond the token is transferrable by Owner
+  when they transfer it, it pays the bond - interest back to Owner
+
+- if you opt for no contest period, you pay less interest 2% vs 5%
+- if you dont have a bond it can be instantly aquired
+- if you have a bond you have a contest to raise bond.
+
+stated price + bond to eat interest
+
+  bond only exists to eat interest
+  bond is depeleted, it eats at stated price
+
+    what if after bond is depleted, interst chips at stated price until post another bond.
+      exponential decay once bond is gone based on time since bond kinda like liquidation
+      bond has to be some >=20% of the stated price
+        - the higher you require the min bond to be the more lax you can make the decay
+      they can change the stated price at any time as long as they have a big enough bond
+
+
+
+structure
+
+Sloths
+  -> commonPartial721  
+  keeps track of who owns what. calls BondManager
+  to determine if transfer is allowed
+
+  NEW METHODS
+
+  takeToken(_tokenId) external payable
+    checks if >= stated price and claims it
+  getClaimablePrice(_tokenId) internal;
+
+  contract queries BondManager to find collected interest
+  calls
+
+    -> IERC721
+    -> BondManager.sol
+      IMPORTS library InterestCalculator.sol
+    -> NftBurner.sol
+      -> logic for reverse bonding curve
+
+  //TODO finish planning
+
+
+gameplan
+  1.) implement 721 interface and boilerplate in place
+  1.5) mock address and setup test environment
+  2.) implement 721 where anyone can claim others NFT
+  3.) make it so a stated price can be placed and bond is
+    posted. Stated price blocks claiming
+  4.) add interest calculator on bond
+  5.) add exponential decrease of stated price
+
+
+  
+
+
+
+
+
+
+
+
+
