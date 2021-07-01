@@ -90,12 +90,10 @@ contract BondTracker {
         uint256 vettedNewBond = uint256(newBond);
         uint256 vettedStatedPrice = uint256(newStatedPrice);
 
-        if (liquidationStartedAt != 0) {
-            require(
-                vettedNewBond > (vettedStatedPrice * minimumBond) / 10000,
-                "Cannot update price or bond from liquidation unless > 10% of statedPrice is posted in bond."
-            );
-        }
+        require(
+            vettedNewBond > (vettedStatedPrice * minimumBond) / 10000,
+            "Cannot update price or bond unless > 10% of statedPrice is posted in bond."
+        );
 
         _bondInfoAtLastCheckpoint.statedPrice = vettedStatedPrice;
         _bondInfoAtLastCheckpoint.bondRemaining = vettedNewBond;
