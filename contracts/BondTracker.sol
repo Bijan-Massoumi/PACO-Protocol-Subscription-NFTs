@@ -5,96 +5,120 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./InterestUtils.sol";
 
 struct BondInfo {
+    uint256 statedPrice;
     uint256 bondRemaining;
     uint256 lastModifiedAt;
     uint256 liquidationStartedAt;
 }
 
 contract BondTracker {
-    mapping(uint256 => uint256) internal _tokenIdToStatedPrice;
-    mapping(address => BondInfo) internal _bondAtLastCheckpoint;
-
-    modifier isNotBeingLiquidated(address owner) {
-        require(
-            _bondAtLastCheckpoint[owner].liquidationStartedAt == 0,
-            "CommonPartialToken: cannot mint a token while being liquidated"
-        );
-        _;
-    }
+    mapping(uint256 => BondInfo) internal _bondInfosAtLastCheckpoint;
+    mapping(address => uint256) internal _bondToBeReturnedToAddress;
 
     // min percentage (10%) of total stated price that
     // must be convered by bond
-    uint16 internal minimumBond = 100;
+    uint16 internal constant minimumBond = 100;
 
-    uint16 interestRate = 200;
+    uint16 constant interestRate = 200;
 
-    function _getCurrentBondInfoForAddress(
-        BondInfo memory lastBondInfo,
-        uint256 statedPriceSum
-    )
+    uint256 constant halfLife = 172800;
+
+    function _getCurrentBondInfoForToken(BondInfo memory lastBondInfo)
         internal
         view
         returns (
-            uint256 remainingBond,
+            uint256 bondRemaining,
             uint256 interestToReap,
             uint256 liquidationStartedAt
         )
     {
-        BondInfo memory bondInfoForAddress = _bondAtLastCheckpoint[owner];
-
         // either they have no tokens or they are being liquidated
         if (
-            bondInfoForAddress.bondRemaining == 0 ||
-            bondInfoForAddress.liquidationStartedAt == 0
+            lastBondInfo.bondRemaining == 0 ||
+            lastBondInfo.liquidationStartedAt == 0
         ) {
-            return (0, 0, bondInfoForAddress.liquidationStartedAt, );
+            return (0, 0, lastBondInfo.liquidationStartedAt);
         }
         uint256 totalInterest = InterestUtils
         ._calculateInterestSinceLastCheckIn(
-            statedPriceSum,
-            bondInfoForAddress.lastModifiedAt,
+            lastBondInfo.statedPrice,
+            lastBondInfo.lastModifiedAt,
             interestRate
         );
-        if (interestToReap > bondInfoForAddress.bondRemaining) {
+        if (interestToReap > lastBondInfo.bondRemaining) {
             return (
                 0,
-                totalInterest - bondInfoForAddress.bondRemaining,
+                totalInterest - lastBondInfo.bondRemaining,
                 InterestUtils._getTimeLiquidationBegan(
-                    statedPriceSum,
-                    bondInfoForAddress.lastModifiedAt,
+                    lastBondInfo.statedPrice,
+                    lastBondInfo.lastModifiedAt,
                     interestRate,
-                    bondInfoForAddress.bondRemaining
+                    lastBondInfo.bondRemaining
                 )
             );
         } else {
             return (
-                bondInfoForAddress.bondRemaining - totalInterest,
+                lastBondInfo.bondRemaining - totalInterest,
                 totalInterest,
-                bondInfoForAddress.liquidationStartedAt,
-
+                lastBondInfo.liquidationStartedAt
             );
         }
     }
 
-    function _reapInterestAndUpdateBond(address owner, uint256 statedPriceSum)
-        internal
-        returns (
-            uint256 remainingBond,
-            uint256 interestToReap,
-            uint256 liquidationStartedAt
-        )
-    {
-        BondInfo storage bondInfo = _bondAtLastCheckpoint[owner];
-
+    function _refreshAndModifyExistingBondInfo(
+        BondInfo storage _bondInfoAtLastCheckpoint,
+        int256 _bondDelta,
+        int256 _statedPriceDelta
+    ) internal returns (uint256 interestToReap, uint256 amountToTransfer) {
+        uint256 bondRemaining;
+        uint256 liquidationStartedAt;
         (
-            remainingBond,
+            bondRemaining,
             interestToReap,
-            liquidationStartedAt,
+            liquidationStartedAt
+        ) = _getCurrentBondInfoForToken(_bondInfoAtLastCheckpoint);
 
-        ) = _getCurrentBondInfoForAddress(bondInfo, statedPriceSum);
+        int256 newBond = int256(bondRemaining) + _bondDelta;
+        int256 newStatedPrice = int256(_bondInfoAtLastCheckpoint.statedPrice) +
+            _statedPriceDelta;
 
-        bondInfo.bondRemaining = remainingBond;
-        bondInfo.interestToReap = interestToReap;
-        bondInfo.liquidationStartedAt = liquidationStartedAt;
+        require(
+            newBond >= 0 && newStatedPrice >= 0,
+            "bad values passed for delta values"
+        );
+
+        uint256 vettedNewBond = uint256(newBond);
+        uint256 vettedStatedPrice = uint256(newStatedPrice);
+
+        if (liquidationStartedAt != 0) {
+            require(
+                vettedNewBond > (vettedStatedPrice * minimumBond) / 10000,
+                "Cannot update price or bond from liquidation unless > 10% of statedPrice is posted in bond."
+            );
+        }
+
+        _bondInfoAtLastCheckpoint.statedPrice = vettedStatedPrice;
+        _bondInfoAtLastCheckpoint.bondRemaining = vettedNewBond;
+        _bondInfoAtLastCheckpoint.lastModifiedAt = block.timestamp;
+        _bondInfoAtLastCheckpoint.liquidationStartedAt = 0;
+
+        amountToTransfer = uint256(_bondDelta);
+    }
+
+    function _generateAndPersistNewBondInfo(
+        uint256 tokenId,
+        uint256 initialStatedPrice,
+        uint256 bondAmount
+    ) internal {
+        require(
+            bondAmount > (initialStatedPrice * minimumBond) / 10000,
+            "Cannot mint/purchase unless > 10% of statedPrice is posted in bond."
+        );
+        _bondInfosAtLastCheckpoint[tokenId] = BondInfo(
+            initialStatedPrice,
+            bondAmount,
+            block.timestamp,
+            0
+        );
     }
 }

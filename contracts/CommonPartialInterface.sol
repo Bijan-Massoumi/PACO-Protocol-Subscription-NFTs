@@ -14,12 +14,14 @@ interface CommonPartiallyOwned {
     function buyToken(
         uint256 tokenId,
         uint256 newPrice,
-        uint256 amountToIncreaseBondBy
+        uint256 bondAmount
     ) external;
 
-    function decreaseBond(uint256 amountToDecreaseBondBy) external;
-
-    function increaseBond(uint256 amountToIncreaseBondBy) external;
+    function alterStatedPriceAndBond(
+        uint256 _tokenId,
+        int256 bondDelta,
+        int256 priceDelta
+    ) external;
 
     function getBond() external view;
 

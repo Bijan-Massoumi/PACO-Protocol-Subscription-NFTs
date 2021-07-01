@@ -26,4 +26,14 @@ library InterestUtils {
                 (interestRate * totalStatedPrice * lastCheckInAt)) /
             (interestRate * totalStatedPrice);
     }
+
+    function getLiquidationPrice(
+        uint256 value,
+        uint256 t,
+        uint256 halfLife
+    ) internal pure returns (uint256 price) {
+        price = value >> (t / halfLife);
+        t %= halfLife;
+        price -= (price * t) / halfLife / 2;
+    }
 }

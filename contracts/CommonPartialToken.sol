@@ -4,11 +4,17 @@ pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 import "./CommonPartialTokenEnumerable.sol";
 import "./BondTracker.sol";
+import "./NftBurner.sol";
+import "./InterestUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
-contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
+contract CommonPartialToken is
+    CommonPartiallyOwnedEnumerable,
+    BondTracker,
+    NftBurner
+{
     using Address for address;
 
     // Mapping from token ID to owner address
@@ -36,11 +42,127 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         return _balances[owner];
     }
 
+    function ownerOf(uint256 tokenId)
+        public
+        view
+        virtual
+        override
+        returns (address)
+    {
+        address owner = _owners[tokenId];
+        require(owner != address(0), "owner query for nonexistent token");
+        return owner;
+    }
+
     function buyToken(
         uint256 tokenId,
         uint256 newPrice,
-        uint256 amountToIncreaseBondBy
-    ) external virtual override {}
+        uint256 bondAmount
+    ) external virtual override {
+        address currentOwnerAddress = ownerOf(tokenId);
+        require(
+            currentOwnerAddress != address(0),
+            "CommonPartialToken: token already minted"
+        );
+        require(
+            currentOwnerAddress != msg.sender,
+            "can't claim your own token."
+        );
+
+        uint256 interestToReap;
+        uint256 liquidationStartedAt;
+        uint256 bondRemaining;
+
+        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
+        (
+            bondRemaining,
+            interestToReap,
+            liquidationStartedAt
+        ) = _getCurrentBondInfoForToken(currentOwnersBond);
+
+        if (liquidationStartedAt == 0) {
+            uint256 buyPrice = InterestUtils.getLiquidationPrice(
+                currentOwnersBond.statedPrice,
+                block.timestamp - liquidationStartedAt,
+                halfLife
+            );
+            erc20ToUse.transferFrom(msg.sender, ownerOf(tokenId), buyPrice);
+        } else {
+            erc20ToUse.transferFrom(
+                msg.sender,
+                ownerOf(tokenId),
+                currentOwnersBond.statedPrice
+            );
+        }
+
+        _bondToBeReturnedToAddress[currentOwnerAddress] += bondRemaining;
+        interestReaped += interestToReap;
+
+        _beforeTokenTransfer(currentOwnerAddress, msg.sender, tokenId);
+        _balances[msg.sender] += 1;
+        _balances[currentOwnerAddress] -= 1;
+        _owners[tokenId] = msg.sender;
+
+        _generateAndPersistNewBondInfo(tokenId, newPrice, bondAmount);
+
+        erc20ToUse.transferFrom(msg.sender, address(this), bondAmount);
+        emit Transfer(currentOwnerAddress, msg.sender, tokenId, newPrice);
+    }
+
+    function alterStatedPriceAndBond(
+        uint256 _tokenId,
+        int256 bondDelta,
+        int256 priceDelta
+    ) external override {
+        require(
+            ownerOf(_tokenId) == msg.sender,
+            "Cannot modify token that is not owned"
+        );
+        uint256 interestToReap;
+        uint256 amountToTransfer;
+        BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[_tokenId];
+        (interestToReap, amountToTransfer) = _refreshAndModifyExistingBondInfo(
+            lastBondInfo,
+            bondDelta,
+            priceDelta
+        );
+        interestReaped += interestToReap;
+        if (amountToTransfer > 0)
+            erc20ToUse.transferFrom(
+                msg.sender,
+                address(this),
+                amountToTransfer
+            );
+    }
+
+    function _mint(
+        address to,
+        uint256 tokenId,
+        uint256 initialStatedPrice,
+        uint256 bondAmount
+    ) internal virtual {
+        require(
+            to != address(0),
+            "CommonPartialToken: mint to the zero address"
+        );
+        require(!_exists(tokenId), "CommonPartialToken: token already minted");
+
+        uint256 remainingBond;
+        uint256 interestToReap;
+        uint256 liquidationStartedAt;
+
+        _beforeTokenTransfer(address(0), to, tokenId);
+        _balances[to] += 1;
+        _owners[tokenId] = to;
+
+        _generateAndPersistNewBondInfo(tokenId, initialStatedPrice, bondAmount);
+        erc20ToUse.transferFrom(to, address(this), bondAmount);
+        emit Transfer(address(0), to, tokenId, initialStatedPrice);
+    }
+
+    function _exists(uint256 tokenId) internal view virtual returns (bool) {
+        return _owners[tokenId] != address(0);
+    }
 
     /**
      * @dev See {IERC721Enumerable-tokenOfOwnerByIndex}.
@@ -83,52 +205,6 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         return _allTokens[index];
     }
 
-    function _mint(
-        address to,
-        uint256 tokenId,
-        uint256 initialStatedPrice,
-        uint256 bondAmount
-    ) internal virtual {
-        require(
-            to != address(0),
-            "CommonPartialToken: mint to the zero address"
-        );
-        require(!_exists(tokenId), "CommonPartialToken: token already minted");
-
-        uint256 remainingBond;
-        uint256 interestToReap;
-        uint256 liquidationStartedAt;
-
-        uint256 totalStatedPrice = _getStatedPriceSum(to);
-        (
-            remainingBond,
-            interestToReap,
-            liquidationStartedAt
-        ) = _reapInterestAndUpdateBond(to, totalStatedPrice);
-
-        require(
-            liquidationStartedAt == 0,
-            "Token cannot be minted while being liquidated."
-        );
-        require(
-            remainingBond + bondAmount >
-                ((initialStatedPrice + totalStatedPrice) * minimumBond) / 10000,
-            "Bond not large enough to cover 10% of the new total stated price."
-        );
-
-        _beforeTokenTransfer(address(0), to, tokenId);
-        _balances[to] += 1;
-        _owners[tokenId] = to;
-
-        erc20ToUse.transferFrom(to, address.this, bondAmount);
-
-        emit Transfer(address(0), to, tokenId, initialStatedPrice);
-    }
-
-    function _exists(uint256 tokenId) internal view virtual returns (bool) {
-        return _owners[tokenId] != address(0);
-    }
-
     /**
      * @dev Hook that is called before any token transfer. This includes minting
      * and burning.
@@ -164,22 +240,21 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     function _getTokenIdsForAddress(address owner)
         public
         view
-        returns (uint256[] tokenIds)
+        returns (uint256[] memory)
     {
-        for (uint256 i = 0; i < balanceOf(owner); i++) {
-            tokenIds.push(tokenOfOwnerByIndex(owner, i));
+        uint256 size = balanceOf(owner);
+        uint256[] memory tokenIds = new uint256[](size);
+        for (uint256 i = 0; i < size; i++) {
+            tokenIds[tokenOfOwnerByIndex(owner, i)];
         }
+        return tokenIds;
     }
 
-    function _getStatedPriceSum(address owner)
-        public
-        view
-        returns (uint256 totalStatedPrice)
-    {
-        for (uint256 i = 0; i < balanceOf(owner); i++) {
-            totalStatedPrice += _tokenIdToStatedPrice[
-                tokenOfOwnerByIndex(owner, i)
-            ];
-        }
+    function withdrawBondRefund() external {
+        erc20ToUse.transferFrom(
+            address(this),
+            msg.sender,
+            _bondToBeReturnedToAddress[msg.sender]
+        );
     }
 }
