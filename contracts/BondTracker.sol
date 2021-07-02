@@ -86,7 +86,6 @@ contract BondTracker {
             newBond >= 0 && newStatedPrice >= 0,
             "bad values passed for delta values"
         );
-
         uint256 vettedNewBond = uint256(newBond);
         uint256 vettedStatedPrice = uint256(newStatedPrice);
 
@@ -100,7 +99,7 @@ contract BondTracker {
         _bondInfoAtLastCheckpoint.lastModifiedAt = block.timestamp;
         _bondInfoAtLastCheckpoint.liquidationStartedAt = 0;
 
-        amountToTransfer = uint256(_bondDelta);
+        amountToTransfer = _bondDelta > 0 ? uint256(_bondDelta) : 0;
     }
 
     function _generateAndPersistNewBondInfo(

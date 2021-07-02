@@ -4,8 +4,8 @@ import { BigNumber, Contract } from 'ethers';
 import { JsonRpcSigner } from '@ethersproject/providers';
 import { network } from 'hardhat';
 import '@nomiclabs/hardhat-waffle';
-import { fstat } from 'fs';
 import fs from 'fs';
+import { increaseTime } from './test-helpers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 const printNumber = (res: any) => {
@@ -14,8 +14,8 @@ const printNumber = (res: any) => {
 
 const oneRai = BigNumber.from('1000000000000000000');
 let commonPartialContract: Contract;
-let raiContract: Contract;
-let raiSigner: JsonRpcSigner;
+let tokenContract: Contract;
+let tokenSigner: JsonRpcSigner;
 let owner: SignerWithAddress;
 let addr1: SignerWithAddress;
 
@@ -23,11 +23,6 @@ const getBalance = async (signer: SignerWithAddress | JsonRpcSigner) => {
   return printNumber(
     await commonPartialContract.balanceOf(signer.getAddress())
   );
-};
-
-const increaseTime = async (amount: number) => {
-  await network.provider.send('evm_increaseTime', [amount]);
-  await network.provider.send('evm_mine');
 };
 
 describe('Common Partial Ownership Contract', function () {
@@ -46,46 +41,46 @@ describe('Common Partial Ownership Contract', function () {
       params: ['0x5d3183cb8967e3c9b605dc35081e5778ee462328'],
     });
 
-    raiSigner = await ethers.provider.getSigner(
+    tokenSigner = await ethers.provider.getSigner(
       '0x5d3183cb8967e3c9b605dc35081e5778ee462328'
     );
     let raiABI = fs.readFileSync('abis/erc20abi.Json', 'utf8');
 
-    raiContract = new Contract(
+    tokenContract = new Contract(
       '0x03ab458634910aad20ef5f1c8ee96f1d6ac54919',
       raiABI,
-      raiSigner
+      tokenSigner
     );
 
-    await raiContract
-      .connect(raiSigner)
+    await tokenContract
+      .connect(tokenSigner)
       .approve(commonPartialContract.address, oneRai.mul(10000));
 
-    await raiContract
+    await tokenContract
       .connect(owner)
       .approve(commonPartialContract.address, oneRai.mul(10000));
 
-    await raiContract
+    await tokenContract
       .connect(addr1)
       .approve(commonPartialContract.address, oneRai.mul(10000));
 
-    await raiContract
-      .connect(raiSigner)
+    await tokenContract
+      .connect(tokenSigner)
       .transfer(owner.address, oneRai.mul(1000));
-    await raiContract
-      .connect(raiSigner)
+    await tokenContract
+      .connect(tokenSigner)
       .transfer(addr1.address, oneRai.mul(1000));
   });
 
   describe(`Testing Minting`, async () => {
     it('Can successfully mint a CPO Sloth', async function () {
       await commonPartialContract
-        .connect(raiSigner)
+        .connect(tokenSigner)
         .mintSloth(oneRai.mul(100), oneRai.mul(11));
 
-      expect((await getBalance(raiSigner)) === 1);
+      expect((await getBalance(tokenSigner)) === 1);
       const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
-        raiSigner.getAddress()
+        tokenSigner.getAddress()
       );
 
       expect(ownedTokens.length === 1);
@@ -98,8 +93,42 @@ describe('Common Partial Ownership Contract', function () {
     it('Mint reverts with too little bond', async () => {
       await expect(
         commonPartialContract
-          .connect(raiSigner)
+          .connect(tokenSigner)
           .mintSloth(oneRai.mul(100), oneRai.mul(9))
+      ).to.be.reverted;
+    });
+  });
+
+  describe(`Testing altering stated price and bond`, async () => {
+    let tokenId: number;
+    before(async () => {
+      const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
+        tokenSigner.getAddress()
+      );
+      tokenId = ownedTokens[0].toNumber();
+    });
+
+    it('Bond can be successfully increased', async () => {
+      await commonPartialContract
+        .connect(tokenSigner)
+        .alterStatedPriceAndBond(tokenId, oneRai.mul(2), 0);
+      const bondAmount = await commonPartialContract.getBond(tokenId);
+      expect(bondAmount < oneRai.mul(13) && bondAmount > oneRai.mul(12));
+    });
+
+    it('Bond can be decreased', async () => {
+      await commonPartialContract
+        .connect(tokenSigner)
+        .alterStatedPriceAndBond(tokenId, oneRai.mul(-2), 0);
+      const res = await commonPartialContract.getBond(tokenId);
+      expect(res > oneRai.mul(10) && res < oneRai.mul(11));
+    });
+
+    it('If bond decreases too much, tx reverts', async () => {
+      await expect(
+        commonPartialContract
+          .connect(tokenSigner)
+          .alterStatedPriceAndBond(tokenId, oneRai.mul(-122), 0)
       ).to.be.reverted;
     });
   });
