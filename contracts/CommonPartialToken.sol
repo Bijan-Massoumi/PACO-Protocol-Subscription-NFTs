@@ -8,7 +8,6 @@ import "./NftBurner.sol";
 import "./InterestUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 
 contract CommonPartialToken is
     CommonPartiallyOwnedEnumerable,
@@ -25,6 +24,9 @@ contract CommonPartialToken is
 
     // Mapping from token ID to approved address
     mapping(uint256 => address) private _tokenApprovals;
+
+    // Mapping from owner to operator approvals
+    mapping(address => mapping(address => bool)) private _operatorApprovals;
 
     IERC20 erc20ToUse;
 
@@ -115,8 +117,8 @@ contract CommonPartialToken is
         int256 priceDelta
     ) external override {
         require(
-            ownerOf(_tokenId) == msg.sender,
-            "Cannot modify token that is not owned"
+            _isApprovedOrOwner(msg.sender, _tokenId),
+            "ERC721: transfer caller is not owner nor approved"
         );
         uint256 interestToReap;
         uint256 amountToTransfer;
@@ -126,6 +128,7 @@ contract CommonPartialToken is
             bondDelta,
             priceDelta
         );
+
         interestReaped += interestToReap;
         if (amountToTransfer > 0)
             erc20ToUse.transferFrom(
@@ -135,33 +138,72 @@ contract CommonPartialToken is
             );
     }
 
-    function _mint(
-        address to,
-        uint256 tokenId,
-        uint256 initialStatedPrice,
-        uint256 bondAmount
-    ) internal virtual {
+    /**
+     * @dev See {IERC721-approve}.
+     */
+    function approve(address to, uint256 tokenId) public virtual override {
+        address owner = ownerOf(tokenId);
+        require(to != owner, "approval to current owner");
+
         require(
-            to != address(0),
-            "CommonPartialToken: mint to the zero address"
+            msg.sender == owner || isApprovedForAll(owner, msg.sender),
+            "ERC721: approve caller is not owner nor approved for all"
         );
-        require(!_exists(tokenId), "CommonPartialToken: token already minted");
 
-        uint256 remainingBond;
-        uint256 interestToReap;
-        uint256 liquidationStartedAt;
-
-        _beforeTokenTransfer(address(0), to, tokenId);
-        _balances[to] += 1;
-        _owners[tokenId] = to;
-
-        _generateAndPersistNewBondInfo(tokenId, initialStatedPrice, bondAmount);
-        erc20ToUse.transferFrom(to, address(this), bondAmount);
-        emit Transfer(address(0), to, tokenId, initialStatedPrice);
+        _approve(to, tokenId);
     }
 
-    function _exists(uint256 tokenId) internal view virtual returns (bool) {
-        return _owners[tokenId] != address(0);
+    /**
+     * @dev See {IERC721-getApproved}.
+     */
+    function getApproved(uint256 tokenId)
+        public
+        view
+        virtual
+        override
+        returns (address)
+    {
+        require(
+            _exists(tokenId),
+            "ERC721: approved query for nonexistent token"
+        );
+
+        return _tokenApprovals[tokenId];
+    }
+
+    /**
+     * @dev See {IERC721-setApprovalForAll}.
+     */
+    function setApprovalForAll(address operator, bool approved)
+        public
+        virtual
+        override
+    {
+        require(operator != msg.sender, "ERC721: approve to caller");
+
+        _operatorApprovals[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
+    }
+
+    /**
+     * @dev See {IERC721-isApprovedForAll}.
+     */
+    function isApprovedForAll(address owner, address operator)
+        public
+        view
+        virtual
+        override
+        returns (bool)
+    {
+        return _operatorApprovals[owner][operator];
+    }
+
+    function withdrawBondRefund() external {
+        erc20ToUse.transferFrom(
+            address(this),
+            msg.sender,
+            _bondToBeReturnedToAddress[msg.sender]
+        );
     }
 
     /**
@@ -203,6 +245,115 @@ contract CommonPartialToken is
             "ERC721Enumerable: global index out of bounds"
         );
         return _allTokens[index];
+    }
+
+    function getBond(uint256 _tokenId)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        uint256 bondRemaining;
+        (bondRemaining, , ) = _getCurrentBondInfoForToken(
+            _bondInfosAtLastCheckpoint[_tokenId]
+        );
+        return bondRemaining;
+    }
+
+    function getPrice(uint256 _tokenId)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        uint256 liquidationStartedAt;
+        BondInfo memory bondInfo = _bondInfosAtLastCheckpoint[_tokenId];
+        (, , liquidationStartedAt) = _getCurrentBondInfoForToken(bondInfo);
+        if (liquidationStartedAt != 0) {
+            return
+                InterestUtils.getLiquidationPrice(
+                    bondInfo.statedPrice,
+                    block.timestamp - liquidationStartedAt,
+                    halfLife
+                );
+        } else {
+            return bondInfo.statedPrice;
+        }
+    }
+
+    function burnToken(uint256 _tokenId) external override {
+        require(msg.sender == ownerOf(_tokenId), "must be owner to burn");
+        _balances[msg.sender] -= 1;
+        delete _owners[_tokenId];
+        delete _bondInfosAtLastCheckpoint[_tokenId];
+        _beforeTokenTransfer(msg.sender, address(0), _tokenId);
+    }
+
+    function getStatedPrice(uint256 _tokenId)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        return _bondInfosAtLastCheckpoint[_tokenId].statedPrice;
+    }
+
+    /**
+     * @dev Approve `to` to operate on `tokenId`
+     *
+     * Emits a {Approval} event.
+     */
+    function _approve(address to, uint256 tokenId) internal virtual {
+        _tokenApprovals[tokenId] = to;
+        emit Approval(ownerOf(tokenId), to, tokenId);
+    }
+
+    /**
+     * @dev Returns whether `spender` is allowed to manage `tokenId`.
+     *
+     * Requirements:
+     *
+     * - `tokenId` must exist.
+     */
+    function _isApprovedOrOwner(address spender, uint256 tokenId)
+        internal
+        view
+        virtual
+        returns (bool)
+    {
+        require(
+            _exists(tokenId),
+            "ERC721: operator query for nonexistent token"
+        );
+        address owner = ownerOf(tokenId);
+        return (spender == owner ||
+            getApproved(tokenId) == spender ||
+            isApprovedForAll(owner, spender));
+    }
+
+    function _mint(
+        address to,
+        uint256 tokenId,
+        uint256 initialStatedPrice,
+        uint256 bondAmount
+    ) internal virtual {
+        require(
+            to != address(0),
+            "CommonPartialToken: mint to the zero address"
+        );
+        require(!_exists(tokenId), "CommonPartialToken: token already minted");
+
+        _beforeTokenTransfer(address(0), to, tokenId);
+        _balances[to] += 1;
+        _owners[tokenId] = to;
+
+        _generateAndPersistNewBondInfo(tokenId, initialStatedPrice, bondAmount);
+        erc20ToUse.transferFrom(to, address(this), bondAmount);
+        emit Transfer(address(0), to, tokenId, initialStatedPrice);
+    }
+
+    function _exists(uint256 tokenId) internal view virtual returns (bool) {
+        return _owners[tokenId] != address(0);
     }
 
     /**
@@ -248,13 +399,5 @@ contract CommonPartialToken is
             tokenIds[tokenOfOwnerByIndex(owner, i)];
         }
         return tokenIds;
-    }
-
-    function withdrawBondRefund() external {
-        erc20ToUse.transferFrom(
-            address(this),
-            msg.sender,
-            _bondToBeReturnedToAddress[msg.sender]
-        );
     }
 }

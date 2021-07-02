@@ -4,6 +4,24 @@ pragma solidity ^0.8.0;
 
 //inspired by ERC721 and ERC721Enumerable
 interface CommonPartiallyOwned {
+    /// @dev This emits when the approved address for an NFT is changed or
+    ///  reaffirmed. The zero address indicates there is no approved address.
+    ///  When a Transfer event emits, this also indicates that the approved
+    ///  address for that NFT (if any) is reset to none.
+    event Approval(
+        address indexed _owner,
+        address indexed _approved,
+        uint256 indexed _tokenId
+    );
+
+    /// @dev This emits when an operator is enabled or disabled for an owner.
+    ///  The operator can manage all NFTs of the owner.
+    event ApprovalForAll(
+        address indexed _owner,
+        address indexed _operator,
+        bool _approved
+    );
+
     event Transfer(address from, address to, uint256 _tokenId, uint256 price);
 
     /**
@@ -23,13 +41,13 @@ interface CommonPartiallyOwned {
         int256 priceDelta
     ) external;
 
-    function getBond() external view;
+    function getBond(uint256 _tokenId) external view returns (uint256);
 
-    function getPrice() external view;
+    function getPrice(uint256 _tokenId) external view returns (uint256);
 
-    function burnToken() external;
+    function burnToken(uint256 _tokenId) external;
 
-    function getStatedPrice() external view;
+    function getStatedPrice(uint256 _tokenId) external view returns (uint256);
 
     function ownerOf(uint256 tokenId) external view returns (address owner);
 
@@ -39,4 +57,26 @@ interface CommonPartiallyOwned {
         external
         view
         returns (address operator);
+
+    /**
+     * @dev Approve or remove `operator` as an operator for the caller.
+     * Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller.
+     *
+     * Requirements:
+     *
+     * - The `operator` cannot be the caller.
+     *
+     * Emits an {ApprovalForAll} event.
+     */
+    function setApprovalForAll(address operator, bool _approved) external;
+
+    /**
+     * @dev Returns if the `operator` is allowed to manage all of the assets of `owner`.
+     *
+     * See {setApprovalForAll}
+     */
+    function isApprovedForAll(address owner, address operator)
+        external
+        view
+        returns (bool);
 }
