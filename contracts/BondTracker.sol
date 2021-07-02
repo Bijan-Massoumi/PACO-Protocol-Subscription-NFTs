@@ -17,7 +17,7 @@ contract BondTracker {
 
     // min percentage (10%) of total stated price that
     // must be convered by bond
-    uint16 internal constant minimumBond = 100;
+    uint16 internal constant minimumBond = 1000;
 
     uint16 constant interestRate = 200;
 
@@ -35,7 +35,7 @@ contract BondTracker {
         // either they have no tokens or they are being liquidated
         if (
             lastBondInfo.bondRemaining == 0 ||
-            lastBondInfo.liquidationStartedAt == 0
+            lastBondInfo.liquidationStartedAt != 0
         ) {
             return (0, 0, lastBondInfo.liquidationStartedAt);
         }
@@ -45,7 +45,7 @@ contract BondTracker {
             lastBondInfo.lastModifiedAt,
             interestRate
         );
-        if (interestToReap > lastBondInfo.bondRemaining) {
+        if (totalInterest > lastBondInfo.bondRemaining) {
             return (
                 0,
                 totalInterest - lastBondInfo.bondRemaining,

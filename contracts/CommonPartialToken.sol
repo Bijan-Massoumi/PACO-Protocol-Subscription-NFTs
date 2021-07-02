@@ -257,6 +257,7 @@ contract CommonPartialToken is
         (bondRemaining, , ) = _getCurrentBondInfoForToken(
             _bondInfosAtLastCheckpoint[_tokenId]
         );
+
         return bondRemaining;
     }
 
@@ -342,7 +343,6 @@ contract CommonPartialToken is
             "CommonPartialToken: mint to the zero address"
         );
         require(!_exists(tokenId), "CommonPartialToken: token already minted");
-
         _beforeTokenTransfer(address(0), to, tokenId);
         _balances[to] += 1;
         _owners[tokenId] = to;
@@ -388,15 +388,15 @@ contract CommonPartialToken is
         }
     }
 
-    function _getTokenIdsForAddress(address owner)
-        public
+    function getTokenIdsForAddress(address owner)
+        external
         view
         returns (uint256[] memory)
     {
         uint256 size = balanceOf(owner);
         uint256[] memory tokenIds = new uint256[](size);
         for (uint256 i = 0; i < size; i++) {
-            tokenIds[tokenOfOwnerByIndex(owner, i)];
+            tokenIds[i] = tokenOfOwnerByIndex(owner, i);
         }
         return tokenIds;
     }
