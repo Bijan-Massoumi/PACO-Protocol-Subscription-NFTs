@@ -18,9 +18,8 @@ contract BondTracker {
     // min percentage (10%) of total stated price that
     // must be convered by bond
     uint16 internal constant minimumBond = 1000;
-
-    uint16 constant interestRate = 200;
-
+    //set by constructor
+    uint16 internal interestRate;
     uint256 constant halfLife = 172800;
 
     function _getCurrentBondInfoForToken(BondInfo memory lastBondInfo)
@@ -45,6 +44,7 @@ contract BondTracker {
             lastBondInfo.lastModifiedAt,
             interestRate
         );
+
         if (totalInterest > lastBondInfo.bondRemaining) {
             return (
                 0,

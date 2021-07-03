@@ -58,6 +58,8 @@ interface CommonPartiallyOwned {
         view
         returns (address operator);
 
+    function isBeingLiquidated(uint256 tokenId) external view returns (bool);
+
     /**
      * @dev Approve or remove `operator` as an operator for the caller.
      * Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller.

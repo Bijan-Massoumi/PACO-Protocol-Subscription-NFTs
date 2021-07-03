@@ -30,8 +30,9 @@ contract CommonPartialToken is
 
     IERC20 erc20ToUse;
 
-    constructor(address erc20Address) {
+    constructor(address erc20Address, uint16 interestRateToSet) {
         erc20ToUse = IERC20(erc20Address);
+        interestRate = interestRateToSet;
     }
 
     function balanceOf(address owner)
@@ -82,7 +83,7 @@ contract CommonPartialToken is
             liquidationStartedAt
         ) = _getCurrentBondInfoForToken(currentOwnersBond);
 
-        if (liquidationStartedAt == 0) {
+        if (liquidationStartedAt != 0) {
             uint256 buyPrice = InterestUtils.getLiquidationPrice(
                 currentOwnersBond.statedPrice,
                 block.timestamp - liquidationStartedAt,
@@ -111,6 +112,38 @@ contract CommonPartialToken is
         emit Transfer(currentOwnerAddress, msg.sender, tokenId, newPrice);
     }
 
+    function isBeingLiquidated(uint256 tokenId)
+        external
+        view
+        override
+        returns (bool)
+    {
+        uint256 interestToReap;
+        uint256 liquidationStartedAt;
+        uint256 bondRemaining;
+
+        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
+        (
+            bondRemaining,
+            interestToReap,
+            liquidationStartedAt
+        ) = _getCurrentBondInfoForToken(currentOwnersBond);
+        return liquidationStartedAt != 0;
+    }
+
+    function getLiquidationStartedAt(uint256 tokenId)
+        external
+        view
+        returns (uint256)
+    {
+        uint256 liquidationStartedAt;
+        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
+        (, , liquidationStartedAt) = _getCurrentBondInfoForToken(
+            currentOwnersBond
+        );
+        return liquidationStartedAt;
+    }
+
     function alterStatedPriceAndBond(
         uint256 _tokenId,
         int256 bondDelta,
@@ -136,6 +169,30 @@ contract CommonPartialToken is
                 address(this),
                 amountToTransfer
             );
+    }
+
+    function getInterestAccumulated() external view returns (uint256) {
+        return interestReaped;
+    }
+
+    function reapInterestForTokenIds(uint256[] calldata tokenIds) external {
+        uint256 interestToReap;
+        uint256 bondRemaining;
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            require(
+                _exists(tokenIds[i]),
+                "token to reap interest for doesnt exist"
+            );
+            BondInfo storage currBondInfo = _bondInfosAtLastCheckpoint[
+                tokenIds[i]
+            ];
+            (bondRemaining, interestToReap, ) = _getCurrentBondInfoForToken(
+                currBondInfo
+            );
+            currBondInfo.bondRemaining = bondRemaining;
+            currBondInfo.lastModifiedAt = block.timestamp;
+            interestReaped += interestToReap;
+        }
     }
 
     /**
@@ -204,6 +261,10 @@ contract CommonPartialToken is
             msg.sender,
             _bondToBeReturnedToAddress[msg.sender]
         );
+    }
+
+    function viewBondRefund(address addr) external view returns (uint256) {
+        return _bondToBeReturnedToAddress[addr];
     }
 
     /**
