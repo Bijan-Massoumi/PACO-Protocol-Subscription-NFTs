@@ -4,15 +4,15 @@ pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 import "./CommonPartialTokenEnumerable.sol";
 import "./BondTracker.sol";
-import "./NftBurner.sol";
 import "./InterestUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract CommonPartialToken is
     CommonPartiallyOwnedEnumerable,
     BondTracker,
-    NftBurner
+    Ownable
 {
     using Address for address;
 
@@ -28,11 +28,27 @@ contract CommonPartialToken is
     // Mapping from owner to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
+    uint256 interestReaped;
+    uint16 mintAndBurnRate;
+
     IERC20 erc20ToUse;
 
-    constructor(address erc20Address, uint16 interestRateToSet) {
+    constructor(
+        address erc20Address,
+        uint16 interestRateToSet,
+        uint16 mintAndBurnRateToSet
+    ) {
         erc20ToUse = IERC20(erc20Address);
         interestRate = interestRateToSet;
+        mintAndBurnRate = mintAndBurnRateToSet;
+    }
+
+    function setInterestRate(uint16 newInterestRate) external onlyOwner {
+        interestRate = newInterestRate;
+    }
+
+    function setMintAndBurnRate(uint16 newMintAndBurnRate) external onlyOwner {
+        mintAndBurnRate = newMintAndBurnRate;
     }
 
     function balanceOf(address owner)
@@ -169,6 +185,27 @@ contract CommonPartialToken is
                 address(this),
                 amountToTransfer
             );
+    }
+
+    function getMintOrBurnCost() public view returns (uint256) {
+        return (interestReaped * mintAndBurnRate) / 10000;
+    }
+
+    function mintTokenForAmount(uint256 amount) external {
+        require(
+            amount == getMintOrBurnCost(),
+            "expected cost not what client expects"
+        );
+        erc20ToUse.transferFrom(msg.sender, address(this), amount);
+    }
+
+    function burnTokenForAmount(uint256 amount, uint256 tokenId) external {
+        require(
+            amount == getMintOrBurnCost(),
+            "expected return not what client expects"
+        );
+        _burnToken(tokenId);
+        erc20ToUse.transferFrom(address(this), msg.sender, amount);
     }
 
     function getInterestAccumulated() external view returns (uint256) {
@@ -343,14 +380,6 @@ contract CommonPartialToken is
         }
     }
 
-    function burnToken(uint256 _tokenId) external override {
-        require(msg.sender == ownerOf(_tokenId), "must be owner to burn");
-        _balances[msg.sender] -= 1;
-        delete _owners[_tokenId];
-        delete _bondInfosAtLastCheckpoint[_tokenId];
-        _beforeTokenTransfer(msg.sender, address(0), _tokenId);
-    }
-
     function getStatedPrice(uint256 _tokenId)
         external
         view
@@ -415,6 +444,14 @@ contract CommonPartialToken is
 
     function _exists(uint256 tokenId) internal view virtual returns (bool) {
         return _owners[tokenId] != address(0);
+    }
+
+    function _burnToken(uint256 _tokenId) internal {
+        require(msg.sender == ownerOf(_tokenId), "must be owner to burn");
+        _beforeTokenTransfer(msg.sender, address(0), _tokenId);
+        _balances[msg.sender] -= 1;
+        delete _owners[_tokenId];
+        delete _bondInfosAtLastCheckpoint[_tokenId];
     }
 
     /**

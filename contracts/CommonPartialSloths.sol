@@ -7,8 +7,16 @@ import "./CommonPartialToken.sol";
 contract CommonPartialSloths is CommonPartialToken {
     uint256 latestTokenId = 1;
 
-    constructor(address erc20Address, uint16 interestRate)
-        CommonPartialToken(erc20Address, interestRate)
+    constructor(
+        address erc20Address,
+        uint16 interestRateToSet,
+        uint16 mintAndBurnRateToSet
+    )
+        CommonPartialToken(
+            erc20Address,
+            interestRateToSet,
+            mintAndBurnRateToSet
+        )
     {}
 
     function mintSloth(uint256 statedPrice, uint256 bond) external {

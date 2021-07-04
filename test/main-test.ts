@@ -7,17 +7,19 @@ import '@nomiclabs/hardhat-waffle';
 import fs from 'fs';
 import { increaseTime, snapshotTime } from './test-helpers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { first } from 'underscore';
+import SlothsArtifact from '../artifacts/contracts/CommonPartialSloths.sol/CommonPartialSloths.json';
+import { CommonPartialSloths } from '../typechain/CommonPartialSloths';
 
 const printNumber = (res: any) => {
   return (res as BigNumber).toNumber();
 };
 
 const interestRate = 2000;
+const minAndBurnRate = 5000;
 const secondsInYear = 31536000;
 const secondsInDay = 86400;
 const oneRai = BigNumber.from('1000000000000000000');
-let commonPartialContract: Contract;
+let commonPartialContract: CommonPartialSloths;
 let tokenContract: Contract;
 let tokenSigner: JsonRpcSigner;
 let owner: SignerWithAddress;
@@ -25,7 +27,7 @@ let addr1: SignerWithAddress;
 
 const getBalance = async (signer: SignerWithAddress | JsonRpcSigner) => {
   return printNumber(
-    await commonPartialContract.balanceOf(signer.getAddress())
+    await commonPartialContract.balanceOf(await signer.getAddress())
   );
 };
 
@@ -36,10 +38,11 @@ describe('Common Partial Ownership Contract', function () {
     const myContractFactory = await ethers.getContractFactory(
       'CommonPartialSloths'
     );
-    commonPartialContract = await myContractFactory.deploy(
+    commonPartialContract = (await myContractFactory.deploy(
       '0x03ab458634910aad20ef5f1c8ee96f1d6ac54919',
-      interestRate
-    );
+      interestRate,
+      minAndBurnRate
+    )) as CommonPartialSloths;
     await commonPartialContract.deployed();
     await network.provider.request({
       method: 'hardhat_impersonateAccount',
@@ -86,7 +89,7 @@ describe('Common Partial Ownership Contract', function () {
 
       expect((await getBalance(tokenSigner)) === 1);
       const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
-        tokenSigner.getAddress()
+        await tokenSigner.getAddress()
       );
 
       expect(ownedTokens.length === 1);
@@ -109,7 +112,7 @@ describe('Common Partial Ownership Contract', function () {
     let tokenId: number;
     before(async () => {
       const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
-        tokenSigner.getAddress()
+        await tokenSigner.getAddress()
       );
       tokenId = ownedTokens[0].toNumber();
     });
@@ -163,7 +166,7 @@ describe('Common Partial Ownership Contract', function () {
     let interestThatShouldBeSubbed: BigNumber;
     before(async () => {
       const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
-        tokenSigner.getAddress()
+        await tokenSigner.getAddress()
       );
       tokenId = ownedTokens[0].toNumber();
     });
@@ -207,7 +210,7 @@ describe('Common Partial Ownership Contract', function () {
     let bondBeforeBoughtOut: BigNumber;
     before(async () => {
       const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
-        tokenSigner.getAddress()
+        await tokenSigner.getAddress()
       );
       tokenId = ownedTokens[0].toNumber();
     });
@@ -221,8 +224,12 @@ describe('Common Partial Ownership Contract', function () {
       await commonPartialContract
         .connect(owner)
         .buyToken(tokenId, oneRai.mul(100), oneRai.mul(11));
-      expect(commonPartialContract.balanceOf(tokenSigner.getAddress()) === 0);
-      expect(commonPartialContract.ownerOf(tokenId) === owner.address);
+      expect(
+        (await commonPartialContract.balanceOf(
+          await tokenSigner.getAddress()
+        )) === BigNumber.from(0)
+      );
+      expect((await commonPartialContract.ownerOf(tokenId)) === owner.address);
       const balanceAfter = await tokenContract.balanceOf(
         tokenSigner.getAddress()
       );
@@ -233,7 +240,11 @@ describe('Common Partial Ownership Contract', function () {
 
     it('Bond refund is available for previous holder', async () => {
       expect(
-        (await commonPartialContract.viewBondRefund(tokenSigner.getAddress()))
+        (
+          await commonPartialContract.viewBondRefund(
+            await tokenSigner.getAddress()
+          )
+        )
           .div(10 ** 12)
           .toString() === bondBeforeBoughtOut.div(10 ** 12).toString()
       );
@@ -261,7 +272,7 @@ describe('Common Partial Ownership Contract', function () {
       const started = await commonPartialContract.getLiquidationStartedAt(
         tokenId
       );
-      expect(started > 0);
+      expect(started > BigNumber.from(0));
       firstPrice = await commonPartialContract.getPrice(tokenId);
       const statedPrice = await commonPartialContract.getStatedPrice(tokenId);
       expect(firstPrice.toString() !== statedPrice.toString());
@@ -279,8 +290,11 @@ describe('Common Partial Ownership Contract', function () {
         .buyToken(tokenId, oneRai.mul(5), oneRai.mul(1));
       const balanceAfter = await tokenContract.balanceOf(addr1.address);
 
-      expect(commonPartialContract.balanceOf(owner.address) === 0);
-      expect(commonPartialContract.ownerOf(tokenId) === addr1.address);
+      expect(
+        (await commonPartialContract.balanceOf(owner.address)) ===
+          BigNumber.from(0)
+      );
+      expect((await commonPartialContract.ownerOf(tokenId)) === addr1.address);
       expect(
         balanceAfter < balanceBefore.sub(depreciatedPrice) &&
           balanceAfter > balanceBefore.sub(firstPrice)

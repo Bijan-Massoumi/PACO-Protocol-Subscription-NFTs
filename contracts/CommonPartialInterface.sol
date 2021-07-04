@@ -45,8 +45,6 @@ interface CommonPartiallyOwned {
 
     function getPrice(uint256 _tokenId) external view returns (uint256);
 
-    function burnToken(uint256 _tokenId) external;
-
     function getStatedPrice(uint256 _tokenId) external view returns (uint256);
 
     function ownerOf(uint256 tokenId) external view returns (address owner);
