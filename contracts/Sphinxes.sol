@@ -9,9 +9,15 @@ contract Sphinxes is CommonPartialToken {
 
     constructor(
         address erc20Address,
-        uint16 interestRateToSet,
-        uint16 mintAndBurnRateToSet
-    ) CommonPartialToken(erc20Address, interestRateToSet) {}
+        address treasuryContractAddress,
+        uint16 interestRateToSet
+    )
+        CommonPartialToken(
+            erc20Address,
+            treasuryContractAddress,
+            interestRateToSet
+        )
+    {}
 
     function mintSloth(uint256 statedPrice, uint256 bond) external {
         if (latestTokenId < 10000) {

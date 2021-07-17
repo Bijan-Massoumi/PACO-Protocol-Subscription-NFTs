@@ -197,7 +197,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     function moveAccumulatedFundsToTreasury() public {
         erc20ToUse.transferFrom(
             address(this),
-            treasuryContractAddress,
+            _treasury,
             interestToSendToTreasury
         );
         interestToSendToTreasury = 0;

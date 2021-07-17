@@ -24,29 +24,29 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     "alterStatedPriceAndBond(uint256,int256,int256)": FunctionFragment;
     "approve(address,uint256)": FunctionFragment;
     "balanceOf(address)": FunctionFragment;
-    "burnTokenForAmount(uint256,uint256)": FunctionFragment;
     "buyToken(uint256,uint256,uint256)": FunctionFragment;
+    "clubAddress()": FunctionFragment;
     "getApproved(uint256)": FunctionFragment;
     "getBond(uint256)": FunctionFragment;
-    "getInterestAccumulated()": FunctionFragment;
     "getLiquidationStartedAt(uint256)": FunctionFragment;
-    "getMintOrBurnCost()": FunctionFragment;
     "getPrice(uint256)": FunctionFragment;
     "getStatedPrice(uint256)": FunctionFragment;
     "getTokenIdsForAddress(address)": FunctionFragment;
     "isApprovedForAll(address,address)": FunctionFragment;
     "isBeingLiquidated(uint256)": FunctionFragment;
-    "mintTokenForAmount(uint256)": FunctionFragment;
+    "moveAccumulatedFundsToTreasury()": FunctionFragment;
     "owner()": FunctionFragment;
     "ownerOf(uint256)": FunctionFragment;
     "reapInterestForTokenIds(uint256[])": FunctionFragment;
     "renounceOwnership()": FunctionFragment;
     "setApprovalForAll(address,bool)": FunctionFragment;
+    "setHalfLife(uint16)": FunctionFragment;
     "setInterestRate(uint16)": FunctionFragment;
-    "setMintAndBurnRate(uint16)": FunctionFragment;
+    "setMinimumBond(uint16)": FunctionFragment;
     "tokenByIndex(uint256)": FunctionFragment;
     "tokenOfOwnerByIndex(address,uint256)": FunctionFragment;
     "totalSupply()": FunctionFragment;
+    "transferClubOwnership(address)": FunctionFragment;
     "transferOwnership(address)": FunctionFragment;
     "viewBondRefund(address)": FunctionFragment;
     "withdrawBondRefund()": FunctionFragment;
@@ -62,12 +62,12 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   ): string;
   encodeFunctionData(functionFragment: "balanceOf", values: [string]): string;
   encodeFunctionData(
-    functionFragment: "burnTokenForAmount",
-    values: [BigNumberish, BigNumberish]
-  ): string;
-  encodeFunctionData(
     functionFragment: "buyToken",
     values: [BigNumberish, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "clubAddress",
+    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "getApproved",
@@ -78,16 +78,8 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "getInterestAccumulated",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "getLiquidationStartedAt",
     values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getMintOrBurnCost",
-    values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "getPrice",
@@ -110,8 +102,8 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "mintTokenForAmount",
-    values: [BigNumberish]
+    functionFragment: "moveAccumulatedFundsToTreasury",
+    values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
   encodeFunctionData(
@@ -131,11 +123,15 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     values: [string, boolean]
   ): string;
   encodeFunctionData(
+    functionFragment: "setHalfLife",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setInterestRate",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "setMintAndBurnRate",
+    functionFragment: "setMinimumBond",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -149,6 +145,10 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "totalSupply",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transferClubOwnership",
+    values: [string]
   ): string;
   encodeFunctionData(
     functionFragment: "transferOwnership",
@@ -169,26 +169,18 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "buyToken", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "burnTokenForAmount",
+    functionFragment: "clubAddress",
     data: BytesLike
   ): Result;
-  decodeFunctionResult(functionFragment: "buyToken", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "getApproved",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "getBond", data: BytesLike): Result;
   decodeFunctionResult(
-    functionFragment: "getInterestAccumulated",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "getLiquidationStartedAt",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getMintOrBurnCost",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "getPrice", data: BytesLike): Result;
@@ -209,7 +201,7 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "mintTokenForAmount",
+    functionFragment: "moveAccumulatedFundsToTreasury",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
@@ -227,11 +219,15 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "setHalfLife",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "setInterestRate",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "setMintAndBurnRate",
+    functionFragment: "setMinimumBond",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -244,6 +240,10 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "totalSupply",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "transferClubOwnership",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -262,12 +262,14 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   events: {
     "Approval(address,address,uint256)": EventFragment;
     "ApprovalForAll(address,address,bool)": EventFragment;
+    "OwnershipClubTransferred(address,address)": EventFragment;
     "OwnershipTransferred(address,address)": EventFragment;
     "Transfer(address,address,uint256,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ApprovalForAll"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "OwnershipClubTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
 }
@@ -334,18 +336,14 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<[BigNumber] & { balance: BigNumber }>;
 
-    burnTokenForAmount(
-      amount: BigNumberish,
-      tokenId: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<ContractTransaction>;
-
     buyToken(
       tokenId: BigNumberish,
       newPrice: BigNumberish,
       bondAmount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
+
+    clubAddress(overrides?: CallOverrides): Promise<[string]>;
 
     getApproved(
       tokenId: BigNumberish,
@@ -357,14 +355,10 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<[BigNumber]>;
 
-    getInterestAccumulated(overrides?: CallOverrides): Promise<[BigNumber]>;
-
     getLiquidationStartedAt(
       tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<[BigNumber]>;
-
-    getMintOrBurnCost(overrides?: CallOverrides): Promise<[BigNumber]>;
 
     getPrice(
       _tokenId: BigNumberish,
@@ -392,8 +386,7 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<[boolean]>;
 
-    mintTokenForAmount(
-      amount: BigNumberish,
+    moveAccumulatedFundsToTreasury(
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
@@ -419,13 +412,18 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
+    setHalfLife(
+      newHalfLife: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
     setInterestRate(
       newInterestRate: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
-    setMintAndBurnRate(
-      newMintAndBurnRate: BigNumberish,
+    setMinimumBond(
+      newMinimumBond: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
@@ -441,6 +439,11 @@ export class CommonPartialToken extends BaseContract {
     ): Promise<[BigNumber]>;
 
     totalSupply(overrides?: CallOverrides): Promise<[BigNumber]>;
+
+    transferClubOwnership(
+      newOwner: string,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
 
     transferOwnership(
       newOwner: string,
@@ -472,18 +475,14 @@ export class CommonPartialToken extends BaseContract {
 
   balanceOf(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
-  burnTokenForAmount(
-    amount: BigNumberish,
-    tokenId: BigNumberish,
-    overrides?: Overrides & { from?: string | Promise<string> }
-  ): Promise<ContractTransaction>;
-
   buyToken(
     tokenId: BigNumberish,
     newPrice: BigNumberish,
     bondAmount: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
+
+  clubAddress(overrides?: CallOverrides): Promise<string>;
 
   getApproved(
     tokenId: BigNumberish,
@@ -495,14 +494,10 @@ export class CommonPartialToken extends BaseContract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
-  getInterestAccumulated(overrides?: CallOverrides): Promise<BigNumber>;
-
   getLiquidationStartedAt(
     tokenId: BigNumberish,
     overrides?: CallOverrides
   ): Promise<BigNumber>;
-
-  getMintOrBurnCost(overrides?: CallOverrides): Promise<BigNumber>;
 
   getPrice(
     _tokenId: BigNumberish,
@@ -530,8 +525,7 @@ export class CommonPartialToken extends BaseContract {
     overrides?: CallOverrides
   ): Promise<boolean>;
 
-  mintTokenForAmount(
-    amount: BigNumberish,
+  moveAccumulatedFundsToTreasury(
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
@@ -554,13 +548,18 @@ export class CommonPartialToken extends BaseContract {
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
+  setHalfLife(
+    newHalfLife: BigNumberish,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
   setInterestRate(
     newInterestRate: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
-  setMintAndBurnRate(
-    newMintAndBurnRate: BigNumberish,
+  setMinimumBond(
+    newMinimumBond: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
@@ -576,6 +575,11 @@ export class CommonPartialToken extends BaseContract {
   ): Promise<BigNumber>;
 
   totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+  transferClubOwnership(
+    newOwner: string,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
 
   transferOwnership(
     newOwner: string,
@@ -604,18 +608,14 @@ export class CommonPartialToken extends BaseContract {
 
     balanceOf(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
-    burnTokenForAmount(
-      amount: BigNumberish,
-      tokenId: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
     buyToken(
       tokenId: BigNumberish,
       newPrice: BigNumberish,
       bondAmount: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
+
+    clubAddress(overrides?: CallOverrides): Promise<string>;
 
     getApproved(
       tokenId: BigNumberish,
@@ -627,14 +627,10 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    getInterestAccumulated(overrides?: CallOverrides): Promise<BigNumber>;
-
     getLiquidationStartedAt(
       tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    getMintOrBurnCost(overrides?: CallOverrides): Promise<BigNumber>;
 
     getPrice(
       _tokenId: BigNumberish,
@@ -662,10 +658,7 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<boolean>;
 
-    mintTokenForAmount(
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
+    moveAccumulatedFundsToTreasury(overrides?: CallOverrides): Promise<void>;
 
     owner(overrides?: CallOverrides): Promise<string>;
 
@@ -684,13 +677,18 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    setHalfLife(
+      newHalfLife: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setInterestRate(
       newInterestRate: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
-    setMintAndBurnRate(
-      newMintAndBurnRate: BigNumberish,
+    setMinimumBond(
+      newMinimumBond: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -706,6 +704,11 @@ export class CommonPartialToken extends BaseContract {
     ): Promise<BigNumber>;
 
     totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+    transferClubOwnership(
+      newOwner: string,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     transferOwnership(
       newOwner: string,
@@ -734,6 +737,14 @@ export class CommonPartialToken extends BaseContract {
     ): TypedEventFilter<
       [string, string, boolean],
       { _owner: string; _operator: string; _approved: boolean }
+    >;
+
+    OwnershipClubTransferred(
+      previousOwner?: string | null,
+      newOwner?: string | null
+    ): TypedEventFilter<
+      [string, string],
+      { previousOwner: string; newOwner: string }
     >;
 
     OwnershipTransferred(
@@ -771,18 +782,14 @@ export class CommonPartialToken extends BaseContract {
 
     balanceOf(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
 
-    burnTokenForAmount(
-      amount: BigNumberish,
-      tokenId: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<BigNumber>;
-
     buyToken(
       tokenId: BigNumberish,
       newPrice: BigNumberish,
       bondAmount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
+
+    clubAddress(overrides?: CallOverrides): Promise<BigNumber>;
 
     getApproved(
       tokenId: BigNumberish,
@@ -794,14 +801,10 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    getInterestAccumulated(overrides?: CallOverrides): Promise<BigNumber>;
-
     getLiquidationStartedAt(
       tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
-
-    getMintOrBurnCost(overrides?: CallOverrides): Promise<BigNumber>;
 
     getPrice(
       _tokenId: BigNumberish,
@@ -829,8 +832,7 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
-    mintTokenForAmount(
-      amount: BigNumberish,
+    moveAccumulatedFundsToTreasury(
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
@@ -856,13 +858,18 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
+    setHalfLife(
+      newHalfLife: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
     setInterestRate(
       newInterestRate: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
-    setMintAndBurnRate(
-      newMintAndBurnRate: BigNumberish,
+    setMinimumBond(
+      newMinimumBond: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
@@ -878,6 +885,11 @@ export class CommonPartialToken extends BaseContract {
     ): Promise<BigNumber>;
 
     totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+    transferClubOwnership(
+      newOwner: string,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
 
     transferOwnership(
       newOwner: string,
@@ -910,18 +922,14 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    burnTokenForAmount(
-      amount: BigNumberish,
-      tokenId: BigNumberish,
-      overrides?: Overrides & { from?: string | Promise<string> }
-    ): Promise<PopulatedTransaction>;
-
     buyToken(
       tokenId: BigNumberish,
       newPrice: BigNumberish,
       bondAmount: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
+
+    clubAddress(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     getApproved(
       tokenId: BigNumberish,
@@ -933,16 +941,10 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    getInterestAccumulated(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
     getLiquidationStartedAt(
       tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
-
-    getMintOrBurnCost(overrides?: CallOverrides): Promise<PopulatedTransaction>;
 
     getPrice(
       _tokenId: BigNumberish,
@@ -970,8 +972,7 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
-    mintTokenForAmount(
-      amount: BigNumberish,
+    moveAccumulatedFundsToTreasury(
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
@@ -997,13 +998,18 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
+    setHalfLife(
+      newHalfLife: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
     setInterestRate(
       newInterestRate: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
-    setMintAndBurnRate(
-      newMintAndBurnRate: BigNumberish,
+    setMinimumBond(
+      newMinimumBond: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
@@ -1019,6 +1025,11 @@ export class CommonPartialToken extends BaseContract {
     ): Promise<PopulatedTransaction>;
 
     totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    transferClubOwnership(
+      newOwner: string,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
 
     transferOwnership(
       newOwner: string,

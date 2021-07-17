@@ -29,13 +29,13 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IERC165__factory>;
     getContractFactory(
+      name: "BondTracker",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.BondTracker__factory>;
+    getContractFactory(
       name: "CommonPartiallyOwned",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.CommonPartiallyOwned__factory>;
-    getContractFactory(
-      name: "CommonPartialSloths",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.CommonPartialSloths__factory>;
     getContractFactory(
       name: "CommonPartialToken",
       signerOrOptions?: ethers.Signer | FactoryOptions
@@ -44,6 +44,22 @@ declare module "hardhat/types/runtime" {
       name: "CommonPartiallyOwnedEnumerable",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.CommonPartiallyOwnedEnumerable__factory>;
+    getContractFactory(
+      name: "TreasuryOwnable",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.TreasuryOwnable__factory>;
+    getContractFactory(
+      name: "Sphinxes",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.Sphinxes__factory>;
+    getContractFactory(
+      name: "SphinxContract",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.SphinxContract__factory>;
+    getContractFactory(
+      name: "Treasury",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.Treasury__factory>;
 
     // default types
     getContractFactory(

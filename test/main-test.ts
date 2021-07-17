@@ -7,8 +7,9 @@ import '@nomiclabs/hardhat-waffle';
 import fs from 'fs';
 import { increaseTime, snapshotTime } from './test-helpers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import SlothsArtifact from '../artifacts/contracts/CommonPartialSloths.sol/CommonPartialSloths.json';
-import { CommonPartialSloths } from '../typechain/CommonPartialSloths';
+import SphinxesArtifact from '../artifacts/contracts/Sphinxes.sol/Sphinxes.json';
+import { Sphinxes } from '../typechain/Sphinxes';
+import { Treasury } from '../typechain/Treasury';
 
 const printNumber = (res: any) => {
   return (res as BigNumber).toNumber();
@@ -19,89 +20,90 @@ const minAndBurnRate = 5000;
 const secondsInYear = 31536000;
 const secondsInDay = 86400;
 const oneRai = BigNumber.from('1000000000000000000');
-let commonPartialContract: CommonPartialSloths;
+const tokenAddress = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
+let sphinxContract: Sphinxes;
+let treasuryContract: Treasury;
 let tokenContract: Contract;
 let tokenSigner: JsonRpcSigner;
 let owner: SignerWithAddress;
 let addr1: SignerWithAddress;
 
 const getBalance = async (signer: SignerWithAddress | JsonRpcSigner) => {
-  return printNumber(
-    await commonPartialContract.balanceOf(await signer.getAddress())
-  );
+  return printNumber(await sphinxContract.balanceOf(await signer.getAddress()));
 };
 
 describe('Common Partial Ownership Contract', function () {
   before(async () => {
     [owner, addr1] = await ethers.getSigners();
 
-    const myContractFactory = await ethers.getContractFactory(
-      'CommonPartialSloths'
-    );
-    commonPartialContract = (await myContractFactory.deploy(
-      '0x03ab458634910aad20ef5f1c8ee96f1d6ac54919',
-      interestRate,
+    const myContractFactory = await ethers.getContractFactory('Sphinxes');
+    const treasuryContractFactory = await ethers.getContractFactory('Treasury');
+    treasuryContract = (await treasuryContractFactory.deploy()) as Treasury;
+
+    sphinxContract = (await myContractFactory.deploy(
+      tokenAddress,
+      treasuryContract.address,
+      interestRate
+    )) as Sphinxes;
+    await sphinxContract.deployed();
+    await treasuryContract.initialize(
+      sphinxContract.address,
+      tokenAddress,
+      minAndBurnRate,
       minAndBurnRate
-    )) as CommonPartialSloths;
-    await commonPartialContract.deployed();
+    );
     await network.provider.request({
       method: 'hardhat_impersonateAccount',
-      params: ['0x5d3183cb8967e3c9b605dc35081e5778ee462328'],
+      params: ['0x422162745B12b8c58D19E348d7c8c134BBeDF886'],
     });
 
     tokenSigner = await ethers.provider.getSigner(
-      '0x5d3183cb8967e3c9b605dc35081e5778ee462328'
-    );
-    let raiABI = fs.readFileSync('abis/erc20abi.Json', 'utf8');
-
-    tokenContract = new Contract(
-      '0x03ab458634910aad20ef5f1c8ee96f1d6ac54919',
-      raiABI,
-      tokenSigner
+      '0x422162745B12b8c58D19E348d7c8c134BBeDF886'
     );
 
+    let erc20Abi = fs.readFileSync('abis/erc20abi.Json', 'utf8');
+
+    tokenContract = new Contract(tokenAddress, erc20Abi, tokenSigner);
     await tokenContract
       .connect(tokenSigner)
-      .approve(commonPartialContract.address, oneRai.mul(10000));
-
+      .approve(sphinxContract.address, oneRai.mul(10000));
     await tokenContract
       .connect(owner)
-      .approve(commonPartialContract.address, oneRai.mul(10000));
-
+      .approve(sphinxContract.address, oneRai.mul(10000));
     await tokenContract
       .connect(addr1)
-      .approve(commonPartialContract.address, oneRai.mul(10000));
+      .approve(sphinxContract.address, oneRai.mul(10000));
+    await tokenContract
+      .connect(tokenSigner)
+      .transfer(owner.address, oneRai.mul(500));
 
     await tokenContract
       .connect(tokenSigner)
-      .transfer(owner.address, oneRai.mul(1000));
-    await tokenContract
-      .connect(tokenSigner)
-      .transfer(addr1.address, oneRai.mul(1000));
+      .transfer(addr1.address, oneRai.mul(500));
     snapshotTime();
   });
 
   describe(`Testing Minting`, async () => {
     it('Can successfully mint a CPO Sloth', async function () {
-      await commonPartialContract
+      await sphinxContract
         .connect(tokenSigner)
         .mintSloth(oneRai.mul(100), oneRai.mul(11));
 
       expect((await getBalance(tokenSigner)) === 1);
-      const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
+      const ownedTokens = await sphinxContract.getTokenIdsForAddress(
         await tokenSigner.getAddress()
       );
 
       expect(ownedTokens.length === 1);
       const tokenId = ownedTokens[0].toNumber();
       await increaseTime(5000);
-      const res = (await commonPartialContract.getBond(tokenId)) as BigNumber;
+      const res = (await sphinxContract.getBond(tokenId)) as BigNumber;
       expect(res > oneRai.mul(10) && res < oneRai.mul(11));
     });
 
     it('Mint reverts with too little bond', async () => {
       await expect(
-        commonPartialContract
+        sphinxContract
           .connect(tokenSigner)
           .mintSloth(oneRai.mul(100), oneRai.mul(9))
       ).to.be.reverted;
@@ -111,49 +113,49 @@ describe('Common Partial Ownership Contract', function () {
   describe(`Testing altering stated price and bond`, async () => {
     let tokenId: number;
     before(async () => {
-      const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
+      const ownedTokens = await sphinxContract.getTokenIdsForAddress(
         await tokenSigner.getAddress()
       );
       tokenId = ownedTokens[0].toNumber();
     });
 
     it('Bond can be successfully increased', async () => {
-      await commonPartialContract
+      await sphinxContract
         .connect(tokenSigner)
         .alterStatedPriceAndBond(tokenId, oneRai.mul(2), 0);
-      const bondAmount = await commonPartialContract.getBond(tokenId);
+      const bondAmount = await sphinxContract.getBond(tokenId);
       expect(bondAmount < oneRai.mul(13) && bondAmount > oneRai.mul(12));
     });
 
     it('Bond can be decreased', async () => {
-      await commonPartialContract
+      await sphinxContract
         .connect(tokenSigner)
         .alterStatedPriceAndBond(tokenId, oneRai.mul(-2), 0);
-      const res = await commonPartialContract.getBond(tokenId);
+      const res = await sphinxContract.getBond(tokenId);
       expect(res > oneRai.mul(10) && res < oneRai.mul(11));
     });
 
     it('If bond decreases too much, tx reverts', async () => {
       await expect(
-        commonPartialContract
+        sphinxContract
           .connect(tokenSigner)
           .alterStatedPriceAndBond(tokenId, oneRai.mul(-122), 0)
       ).to.be.reverted;
     });
 
     it(`Stated price can decrease and reverts when expected from increase`, async () => {
-      await commonPartialContract
+      await sphinxContract
         .connect(tokenSigner)
         .alterStatedPriceAndBond(tokenId, 0, oneRai.mul(-2));
-      const res = await commonPartialContract.getPrice(tokenId);
+      const res = await sphinxContract.getPrice(tokenId);
       expect(res == oneRai.mul(98));
       await expect(
-        commonPartialContract
+        sphinxContract
           .connect(tokenSigner)
           .alterStatedPriceAndBond(tokenId, 0, oneRai.mul(-99))
       ).to.be.revertedWith('bad values passed for delta values');
       await expect(
-        commonPartialContract
+        sphinxContract
           .connect(tokenSigner)
           .alterStatedPriceAndBond(tokenId, 0, oneRai.mul(1009))
       ).to.be.revertedWith(
@@ -165,23 +167,17 @@ describe('Common Partial Ownership Contract', function () {
     let tokenId: number;
     let interestThatShouldBeSubbed: BigNumber;
     before(async () => {
-      const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
+      const ownedTokens = await sphinxContract.getTokenIdsForAddress(
         await tokenSigner.getAddress()
       );
       tokenId = ownedTokens[0].toNumber();
     });
     it('interest is calculated correctly', async () => {
-      const price = (await commonPartialContract.getPrice(
-        tokenId
-      )) as BigNumber;
-      const bondBefore = (await commonPartialContract.getBond(
-        tokenId
-      )) as BigNumber;
+      const price = (await sphinxContract.getPrice(tokenId)) as BigNumber;
+      const bondBefore = (await sphinxContract.getBond(tokenId)) as BigNumber;
       interestThatShouldBeSubbed = price.mul(interestRate).div(10000).div(12);
       await increaseTime(secondsInYear / 12);
-      const bondAfter = (await commonPartialContract.getBond(
-        tokenId
-      )) as BigNumber;
+      const bondAfter = (await sphinxContract.getBond(tokenId)) as BigNumber;
       expect(
         bondBefore.sub(interestThatShouldBeSubbed).toString() ===
           bondAfter.toString()
@@ -189,13 +185,15 @@ describe('Common Partial Ownership Contract', function () {
     });
 
     it('interest is reaped correctly', async () => {
-      const interestBefore =
-        await commonPartialContract.getInterestAccumulated();
+      const interestBefore = await tokenContract.balanceOf(
+        treasuryContract.address
+      );
 
-      await commonPartialContract.reapInterestForTokenIds([tokenId]);
+      await sphinxContract.reapInterestForTokenIds([tokenId]);
 
-      const interestAfter =
-        await commonPartialContract.getInterestAccumulated();
+      const interestAfter = await tokenContract.balanceOf(
+        treasuryContract.address
+      );
 
       expect(
         interestBefore
@@ -209,7 +207,7 @@ describe('Common Partial Ownership Contract', function () {
     let tokenId: number;
     let bondBeforeBoughtOut: BigNumber;
     before(async () => {
-      const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
+      const ownedTokens = await sphinxContract.getTokenIdsForAddress(
         await tokenSigner.getAddress()
       );
       tokenId = ownedTokens[0].toNumber();
@@ -220,16 +218,15 @@ describe('Common Partial Ownership Contract', function () {
         tokenSigner.getAddress()
       );
 
-      bondBeforeBoughtOut = await commonPartialContract.getBond(tokenId);
-      await commonPartialContract
+      bondBeforeBoughtOut = await sphinxContract.getBond(tokenId);
+      await sphinxContract
         .connect(owner)
         .buyToken(tokenId, oneRai.mul(100), oneRai.mul(11));
       expect(
-        (await commonPartialContract.balanceOf(
-          await tokenSigner.getAddress()
-        )) === BigNumber.from(0)
+        (await sphinxContract.balanceOf(await tokenSigner.getAddress())) ===
+          BigNumber.from(0)
       );
-      expect((await commonPartialContract.ownerOf(tokenId)) === owner.address);
+      expect((await sphinxContract.ownerOf(tokenId)) === owner.address);
       const balanceAfter = await tokenContract.balanceOf(
         tokenSigner.getAddress()
       );
@@ -240,20 +237,15 @@ describe('Common Partial Ownership Contract', function () {
 
     it('Bond refund is available for previous holder', async () => {
       expect(
-        (
-          await commonPartialContract.viewBondRefund(
-            await tokenSigner.getAddress()
-          )
-        )
+        (await sphinxContract.viewBondRefund(await tokenSigner.getAddress()))
           .div(10 ** 12)
           .toString() === bondBeforeBoughtOut.div(10 ** 12).toString()
       );
     });
 
     it('Bond can be claimed by previous holder', async () => {
-      await expect(
-        commonPartialContract.connect(tokenSigner).withdrawBondRefund()
-      ).to.be.not.reverted;
+      await expect(sphinxContract.connect(tokenSigner).withdrawBondRefund()).to
+        .be.not.reverted;
     });
   });
 
@@ -262,39 +254,36 @@ describe('Common Partial Ownership Contract', function () {
     let firstPrice: BigNumber;
     let depreciatedPrice: BigNumber;
     before(async () => {
-      const ownedTokens = await commonPartialContract.getTokenIdsForAddress(
+      const ownedTokens = await sphinxContract.getTokenIdsForAddress(
         owner.address
       );
       tokenId = ownedTokens[0].toNumber();
     });
     it('liquidationStartedAt is set', async () => {
       await increaseTime(6.602 * (secondsInYear / 12));
-      const started = await commonPartialContract.getLiquidationStartedAt(
-        tokenId
-      );
+      const started = await sphinxContract.getLiquidationStartedAt(tokenId);
       expect(started > BigNumber.from(0));
-      firstPrice = await commonPartialContract.getPrice(tokenId);
-      const statedPrice = await commonPartialContract.getStatedPrice(tokenId);
+      firstPrice = await sphinxContract.getPrice(tokenId);
+      const statedPrice = await sphinxContract.getStatedPrice(tokenId);
       expect(firstPrice.toString() !== statedPrice.toString());
     });
     it('price halves after two days', async () => {
       await increaseTime(2 * secondsInDay);
-      depreciatedPrice = await commonPartialContract.getPrice(tokenId);
+      depreciatedPrice = await sphinxContract.getPrice(tokenId);
       expect(depreciatedPrice < firstPrice.div(2));
     });
 
     it('NFT can be bought at discount', async () => {
       const balanceBefore = await tokenContract.balanceOf(addr1.address);
-      await commonPartialContract
+      await sphinxContract
         .connect(addr1)
         .buyToken(tokenId, oneRai.mul(5), oneRai.mul(1));
       const balanceAfter = await tokenContract.balanceOf(addr1.address);
 
       expect(
-        (await commonPartialContract.balanceOf(owner.address)) ===
-          BigNumber.from(0)
+        (await sphinxContract.balanceOf(owner.address)) === BigNumber.from(0)
       );
-      expect((await commonPartialContract.ownerOf(tokenId)) === addr1.address);
+      expect((await sphinxContract.ownerOf(tokenId)) === addr1.address);
       expect(
         balanceAfter < balanceBefore.sub(depreciatedPrice) &&
           balanceAfter > balanceBefore.sub(firstPrice)

@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 abstract contract TreasuryOwnable is Ownable {
-    address private _treasury;
+    address internal _treasury;
     event OwnershipClubTransferred(
         address indexed previousOwner,
         address indexed newOwner
