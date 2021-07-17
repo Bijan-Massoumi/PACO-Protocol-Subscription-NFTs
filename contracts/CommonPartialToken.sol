@@ -7,13 +7,8 @@ import "./BondTracker.sol";
 import "./InterestUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CommonPartialToken is
-    CommonPartiallyOwnedEnumerable,
-    BondTracker,
-    Ownable
-{
+contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     using Address for address;
 
     // Mapping from token ID to owner address
@@ -28,27 +23,16 @@ contract CommonPartialToken is
     // Mapping from owner to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
-    uint256 interestReaped;
-    uint16 mintAndBurnRate;
-
+    uint256 interestToSendToTreasury;
     IERC20 erc20ToUse;
 
     constructor(
         address erc20Address,
-        uint16 interestRateToSet,
-        uint16 mintAndBurnRateToSet
-    ) {
+        address treasuryContractToSet,
+        uint16 interestRateToSet
+    ) BondTracker(treasuryContractToSet) {
         erc20ToUse = IERC20(erc20Address);
         interestRate = interestRateToSet;
-        mintAndBurnRate = mintAndBurnRateToSet;
-    }
-
-    function setInterestRate(uint16 newInterestRate) external onlyOwner {
-        interestRate = newInterestRate;
-    }
-
-    function setMintAndBurnRate(uint16 newMintAndBurnRate) external onlyOwner {
-        mintAndBurnRate = newMintAndBurnRate;
     }
 
     function balanceOf(address owner)
@@ -115,7 +99,7 @@ contract CommonPartialToken is
         }
 
         _bondToBeReturnedToAddress[currentOwnerAddress] += bondRemaining;
-        interestReaped += interestToReap;
+        interestToSendToTreasury += interestToReap;
 
         _beforeTokenTransfer(currentOwnerAddress, msg.sender, tokenId);
         _balances[msg.sender] += 1;
@@ -178,41 +162,17 @@ contract CommonPartialToken is
             priceDelta
         );
 
-        interestReaped += interestToReap;
+        interestToSendToTreasury += interestToReap;
         if (amountToTransfer > 0)
             erc20ToUse.transferFrom(
-                msg.sender,
+                ownerOf(_tokenId),
                 address(this),
                 amountToTransfer
             );
     }
 
-    function getMintOrBurnCost() public view returns (uint256) {
-        return (interestReaped * mintAndBurnRate) / 10000;
-    }
-
-    function mintTokenForAmount(uint256 amount) external {
-        require(
-            amount == getMintOrBurnCost(),
-            "expected cost not what client expects"
-        );
-        erc20ToUse.transferFrom(msg.sender, address(this), amount);
-    }
-
-    function burnTokenForAmount(uint256 amount, uint256 tokenId) external {
-        require(
-            amount == getMintOrBurnCost(),
-            "expected return not what client expects"
-        );
-        _burnToken(tokenId);
-        erc20ToUse.transferFrom(address(this), msg.sender, amount);
-    }
-
-    function getInterestAccumulated() external view returns (uint256) {
-        return interestReaped;
-    }
-
     function reapInterestForTokenIds(uint256[] calldata tokenIds) external {
+        uint256 netInterest = 0;
         uint256 interestToReap;
         uint256 bondRemaining;
         for (uint256 i = 0; i < tokenIds.length; i++) {
@@ -228,8 +188,19 @@ contract CommonPartialToken is
             );
             currBondInfo.bondRemaining = bondRemaining;
             currBondInfo.lastModifiedAt = block.timestamp;
-            interestReaped += interestToReap;
+            netInterest += interestToReap;
         }
+        interestToSendToTreasury += netInterest;
+        moveAccumulatedFundsToTreasury();
+    }
+
+    function moveAccumulatedFundsToTreasury() public {
+        erc20ToUse.transferFrom(
+            address(this),
+            treasuryContractAddress,
+            interestToSendToTreasury
+        );
+        interestToSendToTreasury = 0;
     }
 
     /**
@@ -447,9 +418,9 @@ contract CommonPartialToken is
     }
 
     function _burnToken(uint256 _tokenId) internal {
-        require(msg.sender == ownerOf(_tokenId), "must be owner to burn");
-        _beforeTokenTransfer(msg.sender, address(0), _tokenId);
-        _balances[msg.sender] -= 1;
+        address owner = ownerOf(_tokenId);
+        _beforeTokenTransfer(owner, address(0), _tokenId);
+        _balances[owner] -= 1;
         delete _owners[_tokenId];
         delete _bondInfosAtLastCheckpoint[_tokenId];
     }

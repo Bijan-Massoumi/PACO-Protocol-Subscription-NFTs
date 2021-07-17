@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./InterestUtils.sol";
+import "./OwnershipManager.sol";
 
 struct BondInfo {
     uint256 statedPrice;
@@ -11,16 +12,18 @@ struct BondInfo {
     uint256 liquidationStartedAt;
 }
 
-contract BondTracker {
+contract BondTracker is TreasuryOwnable {
     mapping(uint256 => BondInfo) internal _bondInfosAtLastCheckpoint;
     mapping(address => uint256) internal _bondToBeReturnedToAddress;
 
     // min percentage (10%) of total stated price that
     // must be convered by bond
-    uint16 internal constant minimumBond = 1000;
+    uint16 internal minimumBond = 1000;
     //set by constructor
     uint16 internal interestRate;
-    uint256 constant halfLife = 172800;
+    uint256 halfLife = 172800;
+
+    constructor(address treasuryContract) TreasuryOwnable(treasuryContract) {}
 
     function _getCurrentBondInfoForToken(BondInfo memory lastBondInfo)
         internal
@@ -63,6 +66,18 @@ contract BondTracker {
                 lastBondInfo.liquidationStartedAt
             );
         }
+    }
+
+    function setInterestRate(uint16 newInterestRate) external onlyOwner {
+        interestRate = newInterestRate;
+    }
+
+    function setHalfLife(uint16 newHalfLife) external onlyOwner {
+        halfLife = newHalfLife;
+    }
+
+    function setMinimumBond(uint16 newMinimumBond) external onlyOwner {
+        minimumBond = newMinimumBond;
     }
 
     function _refreshAndModifyExistingBondInfo(
