@@ -1,5 +1,5 @@
 node_modules
-
+secrets.ts
 #Hardhat files
 cache
 artifacts
