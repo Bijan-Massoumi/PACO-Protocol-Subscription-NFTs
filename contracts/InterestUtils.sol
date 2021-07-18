@@ -22,9 +22,9 @@ library InterestUtils {
         uint256 bondRemaining
     ) internal pure returns (uint256 liquidationStartedAt) {
         liquidationStartedAt =
-            ((bondRemaining * (31536000 * 10000)) +
-                (interestRate * totalStatedPrice * lastCheckInAt)) /
-            (interestRate * totalStatedPrice);
+            (bondRemaining * (31536000 * 10000)) /
+            (interestRate * totalStatedPrice) +
+            lastCheckInAt;
     }
 
     function getLiquidationPrice(

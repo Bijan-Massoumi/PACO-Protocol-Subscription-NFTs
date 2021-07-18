@@ -64,10 +64,6 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     ) external virtual override {
         address currentOwnerAddress = ownerOf(tokenId);
         require(
-            currentOwnerAddress != address(0),
-            "CommonPartialToken: token already minted"
-        );
-        require(
             currentOwnerAddress != msg.sender,
             "can't claim your own token."
         );
@@ -89,11 +85,11 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
                 block.timestamp - liquidationStartedAt,
                 halfLife
             );
-            erc20ToUse.transferFrom(msg.sender, ownerOf(tokenId), buyPrice);
+            erc20ToUse.transferFrom(msg.sender, currentOwnerAddress, buyPrice);
         } else {
             erc20ToUse.transferFrom(
                 msg.sender,
-                ownerOf(tokenId),
+                currentOwnerAddress,
                 currentOwnersBond.statedPrice
             );
         }
