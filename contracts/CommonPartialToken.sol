@@ -7,6 +7,8 @@ import "./BondTracker.sol";
 import "./InterestUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
+import "./CommonPartialReceiver.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
 contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     using Address for address;
@@ -22,6 +24,8 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
 
     // Mapping from owner to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
+
+    bool buysEnabled = true;
 
     uint256 interestToSendToTreasury;
     IERC20 erc20ToUse;
@@ -61,7 +65,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         uint256 tokenId,
         uint256 newPrice,
         uint256 bondAmount
-    ) external virtual override {
+    ) public virtual override {
         address currentOwnerAddress = ownerOf(tokenId);
         require(
             currentOwnerAddress != msg.sender,
@@ -171,6 +175,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         uint256 netInterest = 0;
         uint256 interestToReap;
         uint256 bondRemaining;
+        uint256 liquidationStartedAt;
         for (uint256 i = 0; i < tokenIds.length; i++) {
             require(
                 _exists(tokenIds[i]),
@@ -179,11 +184,14 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
             BondInfo storage currBondInfo = _bondInfosAtLastCheckpoint[
                 tokenIds[i]
             ];
-            (bondRemaining, interestToReap, ) = _getCurrentBondInfoForToken(
-                currBondInfo
-            );
+            (
+                bondRemaining,
+                interestToReap,
+                liquidationStartedAt
+            ) = _getCurrentBondInfoForToken(currBondInfo);
             currBondInfo.bondRemaining = bondRemaining;
             currBondInfo.lastModifiedAt = block.timestamp;
+            currBondInfo.liquidationStartedAt = liquidationStartedAt;
             netInterest += interestToReap;
         }
         interestToSendToTreasury += netInterest;
@@ -416,9 +424,12 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     function _burnToken(uint256 _tokenId) internal {
         address owner = ownerOf(_tokenId);
         _beforeTokenTransfer(owner, address(0), _tokenId);
+        // Clear approvals
+        _approve(address(0), _tokenId);
         _balances[owner] -= 1;
         delete _owners[_tokenId];
         delete _bondInfosAtLastCheckpoint[_tokenId];
+        emit Transfer(owner, address(0), _tokenId, 0);
     }
 
     /**
@@ -464,5 +475,58 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
             tokenIds[i] = tokenOfOwnerByIndex(owner, i);
         }
         return tokenIds;
+    }
+
+    /**
+     * @dev See {IERC721-safeTransferFrom}.
+     */
+    function safeBuyToken(
+        uint256 tokenId,
+        uint256 statedPrice,
+        uint256 bondAmount,
+        bytes memory _data
+    ) public virtual {
+        address previousOwner = ownerOf(tokenId);
+        buyToken(tokenId, statedPrice, bondAmount);
+        require(
+            _checkOnERC721Received(previousOwner, msg.sender, tokenId, _data),
+            "ERC721: transfer to non ERC721Receiver implementer"
+        );
+    }
+
+    function _checkOnERC721Received(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory _data
+    ) private returns (bool) {
+        if (to.isContract()) {
+            try
+                CommonPartialReceiver(to).onCommonPartialTokenReceived(
+                    from,
+                    tokenId,
+                    _data
+                )
+            returns (bytes4 retval) {
+                return
+                    retval ==
+                    CommonPartialReceiver(to)
+                    .onCommonPartialTokenReceived
+                    .selector;
+            } catch (bytes memory reason) {
+                if (reason.length == 0) {
+                    revert(
+                        "Common Partial Token: buy to non CommonPartialReceiver implementer"
+                    );
+                } else {
+                    // solhint-disable-next-line no-inline-assembly
+                    assembly {
+                        revert(add(32, reason), mload(reason))
+                    }
+                }
+            }
+        } else {
+            return true;
+        }
     }
 }
