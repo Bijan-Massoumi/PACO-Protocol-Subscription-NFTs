@@ -12,9 +12,16 @@ struct BondInfo {
     uint256 liquidationStartedAt;
 }
 
+struct EscrowIntentToReceive {
+    uint256 statedPrice;
+    uint256 bondToPost;
+    uint256 expiry;
+}
+
 contract BondTracker is TreasuryOwnable {
     mapping(uint256 => BondInfo) internal _bondInfosAtLastCheckpoint;
     mapping(address => uint256) internal _bondToBeReturnedToAddress;
+    mapping(address => mapping(uint256 => EscrowIntentToReceive)) escrowIntentToReceive;
 
     // min percentage (10%) of total stated price that
     // must be convered by bond
@@ -105,7 +112,7 @@ contract BondTracker is TreasuryOwnable {
         uint256 vettedStatedPrice = uint256(newStatedPrice);
 
         require(
-            vettedNewBond > (vettedStatedPrice * minimumBond) / 10000,
+            vettedNewBond >= (vettedStatedPrice * minimumBond) / 10000,
             "Cannot update price or bond unless > 10% of statedPrice is posted in bond."
         );
 
@@ -131,6 +138,19 @@ contract BondTracker is TreasuryOwnable {
             bondAmount,
             block.timestamp,
             0
+        );
+    }
+
+    function _setEscrowIntent(
+        uint256 tokenId,
+        uint256 price,
+        uint256 bond,
+        uint256 expiry
+    ) internal {
+        escrowIntentToReceive[msg.sender][tokenId] = EscrowIntentToReceive(
+            price,
+            bond,
+            expiry
         );
     }
 }

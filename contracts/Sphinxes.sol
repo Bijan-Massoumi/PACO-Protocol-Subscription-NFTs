@@ -52,7 +52,6 @@ contract Sphinxes is CommonPartialToken {
 
     function mintSphinx(
         uint256 numberOfTokens,
-        address sender,
         uint256 price,
         uint256 bond
     ) external {
@@ -62,7 +61,11 @@ contract Sphinxes is CommonPartialToken {
             "Purchase would exceed max supply of Sphinxes"
         );
         uint256 mintIndex = totalSupply();
-        _mintSphinx(numberOfTokens, sender, mintIndex, price, bond);
+        _mintSphinx(numberOfTokens, msg.sender, mintIndex, price, bond);
+    }
+
+    function setSaleStatus(bool value) external onlyOwner {
+        saleIsActive = value;
     }
 
     function _mintSphinx(

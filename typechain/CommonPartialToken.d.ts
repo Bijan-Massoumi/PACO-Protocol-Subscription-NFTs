@@ -39,6 +39,7 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     "ownerOf(uint256)": FunctionFragment;
     "reapInterestForTokenIds(uint256[])": FunctionFragment;
     "renounceOwnership()": FunctionFragment;
+    "safeBuyToken(uint256,uint256,uint256,bytes)": FunctionFragment;
     "setApprovalForAll(address,bool)": FunctionFragment;
     "setHalfLife(uint16)": FunctionFragment;
     "setInterestRate(uint16)": FunctionFragment;
@@ -117,6 +118,10 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "renounceOwnership",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "safeBuyToken",
+    values: [BigNumberish, BigNumberish, BigNumberish, BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "setApprovalForAll",
@@ -212,6 +217,10 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "renounceOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "safeBuyToken",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -406,6 +415,14 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
+    safeBuyToken(
+      tokenId: BigNumberish,
+      statedPrice: BigNumberish,
+      bondAmount: BigNumberish,
+      _data: BytesLike,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
     setApprovalForAll(
       operator: string,
       approved: boolean,
@@ -542,6 +559,14 @@ export class CommonPartialToken extends BaseContract {
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
+  safeBuyToken(
+    tokenId: BigNumberish,
+    statedPrice: BigNumberish,
+    bondAmount: BigNumberish,
+    _data: BytesLike,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
   setApprovalForAll(
     operator: string,
     approved: boolean,
@@ -670,6 +695,14 @@ export class CommonPartialToken extends BaseContract {
     ): Promise<void>;
 
     renounceOwnership(overrides?: CallOverrides): Promise<void>;
+
+    safeBuyToken(
+      tokenId: BigNumberish,
+      statedPrice: BigNumberish,
+      bondAmount: BigNumberish,
+      _data: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
 
     setApprovalForAll(
       operator: string,
@@ -852,6 +885,14 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
+    safeBuyToken(
+      tokenId: BigNumberish,
+      statedPrice: BigNumberish,
+      bondAmount: BigNumberish,
+      _data: BytesLike,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
     setApprovalForAll(
       operator: string,
       approved: boolean,
@@ -989,6 +1030,14 @@ export class CommonPartialToken extends BaseContract {
     ): Promise<PopulatedTransaction>;
 
     renounceOwnership(
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    safeBuyToken(
+      tokenId: BigNumberish,
+      statedPrice: BigNumberish,
+      bondAmount: BigNumberish,
+      _data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 

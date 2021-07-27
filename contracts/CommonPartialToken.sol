@@ -2,17 +2,16 @@
 pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./CommonPartialTokenEnumerable.sol";
 import "./BondTracker.sol";
 import "./InterestUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
-import "./CommonPartialReceiver.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
 contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     using Address for address;
-
     // Mapping from token ID to owner address
     mapping(uint256 => address) private _owners;
 
@@ -24,8 +23,6 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
 
     // Mapping from owner to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
-
-    bool buysEnabled = true;
 
     uint256 interestToSendToTreasury;
     IERC20 erc20ToUse;
@@ -101,15 +98,14 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         _bondToBeReturnedToAddress[currentOwnerAddress] += bondRemaining;
         interestToSendToTreasury += interestToReap;
 
-        _beforeTokenTransfer(currentOwnerAddress, msg.sender, tokenId);
-        _balances[msg.sender] += 1;
-        _balances[currentOwnerAddress] -= 1;
-        _owners[tokenId] = msg.sender;
-
-        _generateAndPersistNewBondInfo(tokenId, newPrice, bondAmount);
-
-        erc20ToUse.transferFrom(msg.sender, address(this), bondAmount);
-        emit Transfer(currentOwnerAddress, msg.sender, tokenId, newPrice);
+        _swapAndPostBond(
+            currentOwnerAddress,
+            msg.sender,
+            msg.sender,
+            tokenId,
+            newPrice,
+            bondAmount
+        );
     }
 
     function isBeingLiquidated(uint256 tokenId)
@@ -408,6 +404,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
             "CommonPartialToken: mint to the zero address"
         );
         require(!_exists(tokenId), "CommonPartialToken: token already minted");
+
         _beforeTokenTransfer(address(0), to, tokenId);
         _balances[to] += 1;
         _owners[tokenId] = to;
@@ -478,20 +475,153 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     }
 
     /**
+     * @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
+     * are aware of the ERC721 protocol to prevent tokens from being forever locked.
+     *
+     * Requirements:
+     *
+     * - `from` cannot be the zero address.
+     * - `to` cannot be the zero address.
+     * - `tokenId` token must exist and be owned by `from`.
+     * - If the caller is not `from`, it must be have been allowed to move this token by either {approve} or {setApprovalForAll}.
+     * - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
+     *
+     * Emits a {Transfer} event.
+     */
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public {
+        safeTransferFrom(from, to, tokenId, "");
+    }
+
+    /**
      * @dev See {IERC721-safeTransferFrom}.
      */
-    function safeBuyToken(
+    function safeTransferFrom(
+        address from,
+        address to,
         uint256 tokenId,
-        uint256 statedPrice,
-        uint256 bondAmount,
         bytes memory _data
-    ) public virtual {
-        address previousOwner = ownerOf(tokenId);
-        buyToken(tokenId, statedPrice, bondAmount);
+    ) public {
         require(
-            _checkOnERC721Received(previousOwner, msg.sender, tokenId, _data),
+            _isApprovedOrOwner(_msgSender(), tokenId),
+            "ERC721: transfer caller is not owner nor approved"
+        );
+        _safeTransfer(from, to, tokenId, _data);
+    }
+
+    function _safeTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory _data
+    ) internal virtual {
+        _transfer(from, to, tokenId);
+        require(
+            _checkOnERC721Received(from, to, tokenId, _data),
             "ERC721: transfer to non ERC721Receiver implementer"
         );
+    }
+
+    /**
+     * @dev Transfers `tokenId` token from `from` to `to`.
+     *
+     * WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible.
+     *
+     * Requirements:
+     *
+     * - `from` cannot be the zero address.
+     * - `to` cannot be the zero address.
+     * - `tokenId` token must be owned by `from`.
+     * - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
+     *
+     * Emits a {Transfer} event.
+     */
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public {
+        //solhint-disable-next-line max-line-length
+        require(
+            _isApprovedOrOwner(_msgSender(), tokenId),
+            "Common Partial: transfer caller is not owner nor approved"
+        );
+        _transfer(from, to, tokenId);
+    }
+
+    function _transfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal {
+        address currentOwnerAddress = ownerOf(tokenId);
+        require(
+            currentOwnerAddress == from,
+            "ERC721: transfer of token that is not own"
+        );
+
+        uint256 bondRemaining;
+        uint256 interestToReap;
+        EscrowIntentToReceive memory res = escrowIntentToReceive[to][tokenId];
+        require(res.expiry > block.timestamp, "Intent to receive expired.");
+
+        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
+        (bondRemaining, interestToReap, ) = _getCurrentBondInfoForToken(
+            currentOwnersBond
+        );
+
+        _bondToBeReturnedToAddress[currentOwnerAddress] += bondRemaining;
+        interestToSendToTreasury += interestToReap;
+
+        _swapAndPostBond(
+            currentOwnerAddress,
+            to,
+            to,
+            tokenId,
+            res.statedPrice,
+            res.bondToPost
+        );
+
+        delete escrowIntentToReceive[to][tokenId];
+    }
+
+    function _swapAndPostBond(
+        address from,
+        address to,
+        address payer,
+        uint256 tokenId,
+        uint256 newPrice,
+        uint256 bondAmount
+    ) internal {
+        require(to != address(0), "ERC721: transfer to the zero address");
+
+        // Clear approvals from the previous owner
+        _approve(address(0), tokenId);
+
+        _beforeTokenTransfer(from, to, tokenId);
+        _balances[to] += 1;
+        _balances[from] -= 1;
+        _owners[tokenId] = to;
+
+        _generateAndPersistNewBondInfo(tokenId, newPrice, bondAmount);
+        erc20ToUse.transferFrom(payer, address(this), bondAmount);
+        emit Transfer(from, to, tokenId, newPrice);
+    }
+
+    function setEscrowIntent(
+        uint256 tokenId,
+        uint256 price,
+        uint256 bond,
+        uint256 expiry
+    ) external {
+        require(
+            ownerOf(tokenId) != msg.sender,
+            "Cannot set an escrow for a token you own"
+        );
+        _setEscrowIntent(tokenId, price, bond, expiry);
     }
 
     function _checkOnERC721Received(
@@ -502,21 +632,18 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     ) private returns (bool) {
         if (to.isContract()) {
             try
-                CommonPartialReceiver(to).onCommonPartialTokenReceived(
+                IERC721Receiver(to).onERC721Received(
+                    _msgSender(),
                     from,
                     tokenId,
                     _data
                 )
             returns (bytes4 retval) {
-                return
-                    retval ==
-                    CommonPartialReceiver(to)
-                    .onCommonPartialTokenReceived
-                    .selector;
+                return retval == IERC721Receiver(to).onERC721Received.selector;
             } catch (bytes memory reason) {
                 if (reason.length == 0) {
                     revert(
-                        "Common Partial Token: buy to non CommonPartialReceiver implementer"
+                        "ERC721: transfer to non ERC721Receiver implementer"
                     );
                 } else {
                     // solhint-disable-next-line no-inline-assembly

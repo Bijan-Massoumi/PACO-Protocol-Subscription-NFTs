@@ -21,6 +21,10 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IERC20__factory>;
     getContractFactory(
+      name: "IERC721Metadata",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.IERC721Metadata__factory>;
+    getContractFactory(
       name: "IERC721",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.IERC721__factory>;
@@ -36,6 +40,10 @@ declare module "hardhat/types/runtime" {
       name: "CommonPartiallyOwned",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.CommonPartiallyOwned__factory>;
+    getContractFactory(
+      name: "CommonPartialReceiver",
+      signerOrOptions?: ethers.Signer | FactoryOptions
+    ): Promise<Contracts.CommonPartialReceiver__factory>;
     getContractFactory(
       name: "CommonPartialToken",
       signerOrOptions?: ethers.Signer | FactoryOptions

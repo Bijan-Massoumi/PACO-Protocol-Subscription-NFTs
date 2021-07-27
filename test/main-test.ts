@@ -27,6 +27,7 @@ let tokenContract: Contract;
 let tokenSigner: JsonRpcSigner;
 let owner: SignerWithAddress;
 let addr1: SignerWithAddress;
+let attributeProbs = [[65535], [65535], [65535], [65535], [65535], [65535]];
 
 const getBalance = async (signer: SignerWithAddress | JsonRpcSigner) => {
   return printNumber(await sphinxContract.balanceOf(await signer.getAddress()));
@@ -43,15 +44,11 @@ describe('Common Partial Ownership Contract', function () {
     sphinxContract = (await myContractFactory.deploy(
       tokenAddress,
       treasuryContract.address,
-      interestRate
+      interestRate,
+      ...attributeProbs
     )) as Sphinxes;
     await sphinxContract.deployed();
-    await treasuryContract.initialize(
-      sphinxContract.address,
-      tokenAddress,
-      minAndBurnRate,
-      minAndBurnRate
-    );
+    await treasuryContract.initialize(sphinxContract.address, tokenAddress);
     await network.provider.request({
       method: 'hardhat_impersonateAccount',
       params: ['0x422162745B12b8c58D19E348d7c8c134BBeDF886'],
@@ -60,6 +57,8 @@ describe('Common Partial Ownership Contract', function () {
     tokenSigner = await ethers.provider.getSigner(
       '0x422162745B12b8c58D19E348d7c8c134BBeDF886'
     );
+
+    sphinxContract.setSaleStatus(true);
 
     let erc20Abi = fs.readFileSync('abis/erc20abi.Json', 'utf8');
 
@@ -87,7 +86,7 @@ describe('Common Partial Ownership Contract', function () {
     it('Can successfully mint a CPO Sloth', async function () {
       await sphinxContract
         .connect(tokenSigner)
-        .mintSloth(oneRai.mul(100), oneRai.mul(11));
+        .mintSphinx(1, oneRai.mul(100), oneRai.mul(11));
 
       expect((await getBalance(tokenSigner)) === 1);
       const ownedTokens = await sphinxContract.getTokenIdsForAddress(
@@ -105,7 +104,7 @@ describe('Common Partial Ownership Contract', function () {
       await expect(
         sphinxContract
           .connect(tokenSigner)
-          .mintSloth(oneRai.mul(100), oneRai.mul(9))
+          .mintSphinx(1, oneRai.mul(100), oneRai.mul(9))
       ).to.be.reverted;
     });
   });
