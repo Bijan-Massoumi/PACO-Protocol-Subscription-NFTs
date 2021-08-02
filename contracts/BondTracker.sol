@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 import "hardhat/console.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./InterestUtils.sol";
 import "./OwnershipManager.sol";
 
@@ -111,34 +110,28 @@ contract BondTracker is TreasuryOwnable {
         uint256 vettedNewBond = uint256(newBond);
         uint256 vettedStatedPrice = uint256(newStatedPrice);
 
-        require(
-            vettedNewBond >= (vettedStatedPrice * minimumBond) / 10000,
-            "Cannot update price or bond unless > 10% of statedPrice is posted in bond."
+        _persistNewBondInfo(
+            _bondInfoAtLastCheckpoint,
+            vettedStatedPrice,
+            vettedNewBond
         );
-
-        _bondInfoAtLastCheckpoint.statedPrice = vettedStatedPrice;
-        _bondInfoAtLastCheckpoint.bondRemaining = vettedNewBond;
-        _bondInfoAtLastCheckpoint.lastModifiedAt = block.timestamp;
-        _bondInfoAtLastCheckpoint.liquidationStartedAt = 0;
 
         amountToTransfer = _bondDelta > 0 ? uint256(_bondDelta) : 0;
     }
 
-    function _generateAndPersistNewBondInfo(
-        uint256 tokenId,
-        uint256 initialStatedPrice,
-        uint256 bondAmount
+    function _persistNewBondInfo(
+        BondInfo storage bondInfoRef,
+        uint256 newStatedPrice,
+        uint256 newBondAmount
     ) internal {
         require(
-            bondAmount > (initialStatedPrice * minimumBond) / 10000,
-            "Cannot mint/purchase unless > 10% of statedPrice is posted in bond."
+            newBondAmount >= (newStatedPrice * minimumBond) / 10000,
+            " > 10% of statedPrice must be posted in bond."
         );
-        _bondInfosAtLastCheckpoint[tokenId] = BondInfo(
-            initialStatedPrice,
-            bondAmount,
-            block.timestamp,
-            0
-        );
+        bondInfoRef.statedPrice = newStatedPrice;
+        bondInfoRef.bondRemaining = newBondAmount;
+        bondInfoRef.lastModifiedAt = block.timestamp;
+        bondInfoRef.liquidationStartedAt = 0;
     }
 
     function _setEscrowIntent(

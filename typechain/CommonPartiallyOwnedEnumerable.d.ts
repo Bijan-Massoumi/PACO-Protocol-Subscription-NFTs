@@ -33,10 +33,13 @@ interface CommonPartiallyOwnedEnumerableInterface
     "isApprovedForAll(address,address)": FunctionFragment;
     "isBeingLiquidated(uint256)": FunctionFragment;
     "ownerOf(uint256)": FunctionFragment;
+    "safeTransferFrom(address,address,uint256)": FunctionFragment;
     "setApprovalForAll(address,bool)": FunctionFragment;
+    "setEscrowIntent(uint256,uint256,uint256,uint256)": FunctionFragment;
     "tokenByIndex(uint256)": FunctionFragment;
     "tokenOfOwnerByIndex(address,uint256)": FunctionFragment;
     "totalSupply()": FunctionFragment;
+    "transferFrom(address,address,uint256)": FunctionFragment;
   };
 
   encodeFunctionData(
@@ -81,8 +84,16 @@ interface CommonPartiallyOwnedEnumerableInterface
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "safeTransferFrom",
+    values: [string, string, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "setApprovalForAll",
     values: [string, boolean]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setEscrowIntent",
+    values: [BigNumberish, BigNumberish, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "tokenByIndex",
@@ -95,6 +106,10 @@ interface CommonPartiallyOwnedEnumerableInterface
   encodeFunctionData(
     functionFragment: "totalSupply",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "transferFrom",
+    values: [string, string, BigNumberish]
   ): string;
 
   decodeFunctionResult(
@@ -124,7 +139,15 @@ interface CommonPartiallyOwnedEnumerableInterface
   ): Result;
   decodeFunctionResult(functionFragment: "ownerOf", data: BytesLike): Result;
   decodeFunctionResult(
+    functionFragment: "safeTransferFrom",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "setApprovalForAll",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setEscrowIntent",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -139,15 +162,21 @@ interface CommonPartiallyOwnedEnumerableInterface
     functionFragment: "totalSupply",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "transferFrom",
+    data: BytesLike
+  ): Result;
 
   events: {
     "Approval(address,address,uint256)": EventFragment;
     "ApprovalForAll(address,address,bool)": EventFragment;
-    "Transfer(address,address,uint256,uint256)": EventFragment;
+    "NewPriceSet(address,uint256,uint256)": EventFragment;
+    "Transfer(address,address,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ApprovalForAll"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "NewPriceSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
 }
 
@@ -256,9 +285,32 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
       overrides?: CallOverrides
     ): Promise<[string] & { owner: string }>;
 
+    "safeTransferFrom(address,address,uint256)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
+    "safeTransferFrom(address,address,uint256,bytes)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      data: BytesLike,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
     setApprovalForAll(
       operator: string,
       _approved: boolean,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
+    setEscrowIntent(
+      tokenId: BigNumberish,
+      price: BigNumberish,
+      bond: BigNumberish,
+      expiry: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
@@ -274,6 +326,13 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
     ): Promise<[BigNumber] & { tokenId: BigNumber }>;
 
     totalSupply(overrides?: CallOverrides): Promise<[BigNumber]>;
+
+    transferFrom(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
   };
 
   alterStatedPriceAndBond(
@@ -331,9 +390,32 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
 
   ownerOf(tokenId: BigNumberish, overrides?: CallOverrides): Promise<string>;
 
+  "safeTransferFrom(address,address,uint256)"(
+    from: string,
+    to: string,
+    tokenId: BigNumberish,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
+  "safeTransferFrom(address,address,uint256,bytes)"(
+    from: string,
+    to: string,
+    tokenId: BigNumberish,
+    data: BytesLike,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
   setApprovalForAll(
     operator: string,
     _approved: boolean,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
+  setEscrowIntent(
+    tokenId: BigNumberish,
+    price: BigNumberish,
+    bond: BigNumberish,
+    expiry: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
@@ -349,6 +431,13 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
   ): Promise<BigNumber>;
 
   totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+  transferFrom(
+    from: string,
+    to: string,
+    tokenId: BigNumberish,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
 
   callStatic: {
     alterStatedPriceAndBond(
@@ -406,9 +495,32 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
 
     ownerOf(tokenId: BigNumberish, overrides?: CallOverrides): Promise<string>;
 
+    "safeTransferFrom(address,address,uint256)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "safeTransferFrom(address,address,uint256,bytes)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      data: BytesLike,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     setApprovalForAll(
       operator: string,
       _approved: boolean,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setEscrowIntent(
+      tokenId: BigNumberish,
+      price: BigNumberish,
+      bond: BigNumberish,
+      expiry: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -424,6 +536,13 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
     ): Promise<BigNumber>;
 
     totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+    transferFrom(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
   };
 
   filters: {
@@ -445,14 +564,22 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
       { _owner: string; _operator: string; _approved: boolean }
     >;
 
+    NewPriceSet(
+      owner?: null,
+      tokenId?: null,
+      price?: null
+    ): TypedEventFilter<
+      [string, BigNumber, BigNumber],
+      { owner: string; tokenId: BigNumber; price: BigNumber }
+    >;
+
     Transfer(
       from?: null,
       to?: null,
-      _tokenId?: null,
-      price?: null
+      _tokenId?: null
     ): TypedEventFilter<
-      [string, string, BigNumber, BigNumber],
-      { from: string; to: string; _tokenId: BigNumber; price: BigNumber }
+      [string, string, BigNumber],
+      { from: string; to: string; _tokenId: BigNumber }
     >;
   };
 
@@ -515,9 +642,32 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    "safeTransferFrom(address,address,uint256)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
+    "safeTransferFrom(address,address,uint256,bytes)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      data: BytesLike,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
     setApprovalForAll(
       operator: string,
       _approved: boolean,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
+    setEscrowIntent(
+      tokenId: BigNumberish,
+      price: BigNumberish,
+      bond: BigNumberish,
+      expiry: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
@@ -533,6 +683,13 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
     ): Promise<BigNumber>;
 
     totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+
+    transferFrom(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
   };
 
   populateTransaction: {
@@ -597,9 +754,32 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 
+    "safeTransferFrom(address,address,uint256)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    "safeTransferFrom(address,address,uint256,bytes)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      data: BytesLike,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
     setApprovalForAll(
       operator: string,
       _approved: boolean,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    setEscrowIntent(
+      tokenId: BigNumberish,
+      price: BigNumberish,
+      bond: BigNumberish,
+      expiry: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
@@ -615,5 +795,12 @@ export class CommonPartiallyOwnedEnumerable extends BaseContract {
     ): Promise<PopulatedTransaction>;
 
     totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+
+    transferFrom(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
   };
 }

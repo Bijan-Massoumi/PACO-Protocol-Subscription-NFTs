@@ -16,7 +16,6 @@ const printNumber = (res: any) => {
 };
 
 const interestRate = 2000;
-const minAndBurnRate = 5000;
 const secondsInYear = 31536000;
 const secondsInDay = 86400;
 const oneRai = BigNumber.from('1000000000000000000');

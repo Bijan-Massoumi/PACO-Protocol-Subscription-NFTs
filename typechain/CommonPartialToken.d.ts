@@ -24,6 +24,7 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     "alterStatedPriceAndBond(uint256,int256,int256)": FunctionFragment;
     "approve(address,uint256)": FunctionFragment;
     "balanceOf(address)": FunctionFragment;
+    "burnToken(uint256)": FunctionFragment;
     "buyToken(uint256,uint256,uint256)": FunctionFragment;
     "clubAddress()": FunctionFragment;
     "getApproved(uint256)": FunctionFragment;
@@ -39,8 +40,9 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     "ownerOf(uint256)": FunctionFragment;
     "reapInterestForTokenIds(uint256[])": FunctionFragment;
     "renounceOwnership()": FunctionFragment;
-    "safeBuyToken(uint256,uint256,uint256,bytes)": FunctionFragment;
+    "safeTransferFrom(address,address,uint256)": FunctionFragment;
     "setApprovalForAll(address,bool)": FunctionFragment;
+    "setEscrowIntent(uint256,uint256,uint256,uint256)": FunctionFragment;
     "setHalfLife(uint16)": FunctionFragment;
     "setInterestRate(uint16)": FunctionFragment;
     "setMinimumBond(uint16)": FunctionFragment;
@@ -48,6 +50,7 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     "tokenOfOwnerByIndex(address,uint256)": FunctionFragment;
     "totalSupply()": FunctionFragment;
     "transferClubOwnership(address)": FunctionFragment;
+    "transferFrom(address,address,uint256)": FunctionFragment;
     "transferOwnership(address)": FunctionFragment;
     "viewBondRefund(address)": FunctionFragment;
     "withdrawBondRefund()": FunctionFragment;
@@ -62,6 +65,10 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     values: [string, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "balanceOf", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "burnToken",
+    values: [BigNumberish]
+  ): string;
   encodeFunctionData(
     functionFragment: "buyToken",
     values: [BigNumberish, BigNumberish, BigNumberish]
@@ -120,12 +127,16 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "safeBuyToken",
-    values: [BigNumberish, BigNumberish, BigNumberish, BytesLike]
+    functionFragment: "safeTransferFrom",
+    values: [string, string, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "setApprovalForAll",
     values: [string, boolean]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setEscrowIntent",
+    values: [BigNumberish, BigNumberish, BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "setHalfLife",
@@ -156,6 +167,10 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     values: [string]
   ): string;
   encodeFunctionData(
+    functionFragment: "transferFrom",
+    values: [string, string, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "transferOwnership",
     values: [string]
   ): string;
@@ -174,6 +189,7 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "burnToken", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "buyToken", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "clubAddress",
@@ -220,11 +236,15 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "safeBuyToken",
+    functionFragment: "safeTransferFrom",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
     functionFragment: "setApprovalForAll",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setEscrowIntent",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -256,6 +276,10 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "transferFrom",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "transferOwnership",
     data: BytesLike
   ): Result;
@@ -271,13 +295,15 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   events: {
     "Approval(address,address,uint256)": EventFragment;
     "ApprovalForAll(address,address,bool)": EventFragment;
+    "NewPriceSet(address,uint256,uint256)": EventFragment;
     "OwnershipClubTransferred(address,address)": EventFragment;
     "OwnershipTransferred(address,address)": EventFragment;
-    "Transfer(address,address,uint256,uint256)": EventFragment;
+    "Transfer(address,address,uint256)": EventFragment;
   };
 
   getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "ApprovalForAll"): EventFragment;
+  getEvent(nameOrSignatureOrTopic: "NewPriceSet"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "OwnershipClubTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
   getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
@@ -344,6 +370,11 @@ export class CommonPartialToken extends BaseContract {
       owner: string,
       overrides?: CallOverrides
     ): Promise<[BigNumber] & { balance: BigNumber }>;
+
+    burnToken(
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
 
     buyToken(
       tokenId: BigNumberish,
@@ -415,10 +446,17 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
-    safeBuyToken(
+    "safeTransferFrom(address,address,uint256)"(
+      from: string,
+      to: string,
       tokenId: BigNumberish,
-      statedPrice: BigNumberish,
-      bondAmount: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
+    "safeTransferFrom(address,address,uint256,bytes)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
       _data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
@@ -426,6 +464,14 @@ export class CommonPartialToken extends BaseContract {
     setApprovalForAll(
       operator: string,
       approved: boolean,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
+    setEscrowIntent(
+      tokenId: BigNumberish,
+      price: BigNumberish,
+      bond: BigNumberish,
+      expiry: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
@@ -462,6 +508,13 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<ContractTransaction>;
 
+    transferFrom(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<ContractTransaction>;
+
     transferOwnership(
       newOwner: string,
       overrides?: Overrides & { from?: string | Promise<string> }
@@ -491,6 +544,11 @@ export class CommonPartialToken extends BaseContract {
   ): Promise<ContractTransaction>;
 
   balanceOf(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+  burnToken(
+    tokenId: BigNumberish,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
 
   buyToken(
     tokenId: BigNumberish,
@@ -559,10 +617,17 @@ export class CommonPartialToken extends BaseContract {
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
-  safeBuyToken(
+  "safeTransferFrom(address,address,uint256)"(
+    from: string,
+    to: string,
     tokenId: BigNumberish,
-    statedPrice: BigNumberish,
-    bondAmount: BigNumberish,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
+  "safeTransferFrom(address,address,uint256,bytes)"(
+    from: string,
+    to: string,
+    tokenId: BigNumberish,
     _data: BytesLike,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
@@ -570,6 +635,14 @@ export class CommonPartialToken extends BaseContract {
   setApprovalForAll(
     operator: string,
     approved: boolean,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
+  setEscrowIntent(
+    tokenId: BigNumberish,
+    price: BigNumberish,
+    bond: BigNumberish,
+    expiry: BigNumberish,
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
@@ -606,6 +679,13 @@ export class CommonPartialToken extends BaseContract {
     overrides?: Overrides & { from?: string | Promise<string> }
   ): Promise<ContractTransaction>;
 
+  transferFrom(
+    from: string,
+    to: string,
+    tokenId: BigNumberish,
+    overrides?: Overrides & { from?: string | Promise<string> }
+  ): Promise<ContractTransaction>;
+
   transferOwnership(
     newOwner: string,
     overrides?: Overrides & { from?: string | Promise<string> }
@@ -632,6 +712,8 @@ export class CommonPartialToken extends BaseContract {
     ): Promise<void>;
 
     balanceOf(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    burnToken(tokenId: BigNumberish, overrides?: CallOverrides): Promise<void>;
 
     buyToken(
       tokenId: BigNumberish,
@@ -696,10 +778,17 @@ export class CommonPartialToken extends BaseContract {
 
     renounceOwnership(overrides?: CallOverrides): Promise<void>;
 
-    safeBuyToken(
+    "safeTransferFrom(address,address,uint256)"(
+      from: string,
+      to: string,
       tokenId: BigNumberish,
-      statedPrice: BigNumberish,
-      bondAmount: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    "safeTransferFrom(address,address,uint256,bytes)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
       _data: BytesLike,
       overrides?: CallOverrides
     ): Promise<void>;
@@ -707,6 +796,14 @@ export class CommonPartialToken extends BaseContract {
     setApprovalForAll(
       operator: string,
       approved: boolean,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
+    setEscrowIntent(
+      tokenId: BigNumberish,
+      price: BigNumberish,
+      bond: BigNumberish,
+      expiry: BigNumberish,
       overrides?: CallOverrides
     ): Promise<void>;
 
@@ -743,6 +840,13 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<void>;
 
+    transferFrom(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<void>;
+
     transferOwnership(
       newOwner: string,
       overrides?: CallOverrides
@@ -772,6 +876,15 @@ export class CommonPartialToken extends BaseContract {
       { _owner: string; _operator: string; _approved: boolean }
     >;
 
+    NewPriceSet(
+      owner?: null,
+      tokenId?: null,
+      price?: null
+    ): TypedEventFilter<
+      [string, BigNumber, BigNumber],
+      { owner: string; tokenId: BigNumber; price: BigNumber }
+    >;
+
     OwnershipClubTransferred(
       previousOwner?: string | null,
       newOwner?: string | null
@@ -791,11 +904,10 @@ export class CommonPartialToken extends BaseContract {
     Transfer(
       from?: null,
       to?: null,
-      _tokenId?: null,
-      price?: null
+      _tokenId?: null
     ): TypedEventFilter<
-      [string, string, BigNumber, BigNumber],
-      { from: string; to: string; _tokenId: BigNumber; price: BigNumber }
+      [string, string, BigNumber],
+      { from: string; to: string; _tokenId: BigNumber }
     >;
   };
 
@@ -814,6 +926,11 @@ export class CommonPartialToken extends BaseContract {
     ): Promise<BigNumber>;
 
     balanceOf(owner: string, overrides?: CallOverrides): Promise<BigNumber>;
+
+    burnToken(
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
 
     buyToken(
       tokenId: BigNumberish,
@@ -885,10 +1002,17 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
-    safeBuyToken(
+    "safeTransferFrom(address,address,uint256)"(
+      from: string,
+      to: string,
       tokenId: BigNumberish,
-      statedPrice: BigNumberish,
-      bondAmount: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
+    "safeTransferFrom(address,address,uint256,bytes)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
       _data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
@@ -896,6 +1020,14 @@ export class CommonPartialToken extends BaseContract {
     setApprovalForAll(
       operator: string,
       approved: boolean,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
+    setEscrowIntent(
+      tokenId: BigNumberish,
+      price: BigNumberish,
+      bond: BigNumberish,
+      expiry: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
@@ -932,6 +1064,13 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<BigNumber>;
 
+    transferFrom(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<BigNumber>;
+
     transferOwnership(
       newOwner: string,
       overrides?: Overrides & { from?: string | Promise<string> }
@@ -961,6 +1100,11 @@ export class CommonPartialToken extends BaseContract {
     balanceOf(
       owner: string,
       overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    burnToken(
+      tokenId: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
     buyToken(
@@ -1033,10 +1177,17 @@ export class CommonPartialToken extends BaseContract {
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
-    safeBuyToken(
+    "safeTransferFrom(address,address,uint256)"(
+      from: string,
+      to: string,
       tokenId: BigNumberish,
-      statedPrice: BigNumberish,
-      bondAmount: BigNumberish,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    "safeTransferFrom(address,address,uint256,bytes)"(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
       _data: BytesLike,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
@@ -1044,6 +1195,14 @@ export class CommonPartialToken extends BaseContract {
     setApprovalForAll(
       operator: string,
       approved: boolean,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    setEscrowIntent(
+      tokenId: BigNumberish,
+      price: BigNumberish,
+      bond: BigNumberish,
+      expiry: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 
@@ -1077,6 +1236,13 @@ export class CommonPartialToken extends BaseContract {
 
     transferClubOwnership(
       newOwner: string,
+      overrides?: Overrides & { from?: string | Promise<string> }
+    ): Promise<PopulatedTransaction>;
+
+    transferFrom(
+      from: string,
+      to: string,
+      tokenId: BigNumberish,
       overrides?: Overrides & { from?: string | Promise<string> }
     ): Promise<PopulatedTransaction>;
 

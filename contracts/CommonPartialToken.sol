@@ -5,10 +5,16 @@ import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./CommonPartialTokenEnumerable.sol";
 import "./BondTracker.sol";
-import "./InterestUtils.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+
+interface ERC20 {
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
+}
 
 contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     using Address for address;
@@ -25,14 +31,14 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
     uint256 interestToSendToTreasury;
-    IERC20 erc20ToUse;
+    ERC20 erc20ToUse;
 
     constructor(
         address erc20Address,
         address treasuryContractToSet,
         uint16 interestRateToSet
     ) BondTracker(treasuryContractToSet) {
-        erc20ToUse = IERC20(erc20Address);
+        erc20ToUse = ERC20(erc20Address);
         interestRate = interestRateToSet;
     }
 
@@ -152,11 +158,19 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         uint256 interestToReap;
         uint256 amountToTransfer;
         BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[_tokenId];
+        uint256 lastPrice = lastBondInfo.statedPrice;
         (interestToReap, amountToTransfer) = _refreshAndModifyExistingBondInfo(
             lastBondInfo,
             bondDelta,
             priceDelta
         );
+        if (lastPrice != lastBondInfo.statedPrice) {
+            emit NewPriceSet(
+                ownerOf(_tokenId),
+                _tokenId,
+                lastBondInfo.statedPrice
+            );
+        }
 
         interestToSendToTreasury += interestToReap;
         if (amountToTransfer > 0)
@@ -330,6 +344,14 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         return bondRemaining;
     }
 
+    function burnToken(uint256 tokenId) external {
+        require(
+            ownerOf(tokenId) == msg.sender,
+            "Cannot burn token that sender doesnt own"
+        );
+        _burnToken(tokenId);
+    }
+
     function getPrice(uint256 _tokenId)
         external
         view
@@ -408,10 +430,11 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         _beforeTokenTransfer(address(0), to, tokenId);
         _balances[to] += 1;
         _owners[tokenId] = to;
-
-        _generateAndPersistNewBondInfo(tokenId, initialStatedPrice, bondAmount);
+        BondInfo storage bondInfoRef = _bondInfosAtLastCheckpoint[tokenId];
+        _persistNewBondInfo(bondInfoRef, initialStatedPrice, bondAmount);
         erc20ToUse.transferFrom(to, address(this), bondAmount);
-        emit Transfer(address(0), to, tokenId, initialStatedPrice);
+        emit Transfer(address(0), to, tokenId);
+        emit NewPriceSet(to, tokenId, initialStatedPrice);
     }
 
     function _exists(uint256 tokenId) internal view virtual returns (bool) {
@@ -426,7 +449,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         _balances[owner] -= 1;
         delete _owners[_tokenId];
         delete _bondInfosAtLastCheckpoint[_tokenId];
-        emit Transfer(owner, address(0), _tokenId, 0);
+        emit Transfer(owner, address(0), _tokenId);
     }
 
     /**
@@ -492,7 +515,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         address from,
         address to,
         uint256 tokenId
-    ) public {
+    ) public override {
         safeTransferFrom(from, to, tokenId, "");
     }
 
@@ -504,7 +527,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         address to,
         uint256 tokenId,
         bytes memory _data
-    ) public {
+    ) public override {
         require(
             _isApprovedOrOwner(_msgSender(), tokenId),
             "ERC721: transfer caller is not owner nor approved"
@@ -543,7 +566,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         address from,
         address to,
         uint256 tokenId
-    ) public {
+    ) public override {
         //solhint-disable-next-line max-line-length
         require(
             _isApprovedOrOwner(_msgSender(), tokenId),
@@ -606,9 +629,12 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         _balances[from] -= 1;
         _owners[tokenId] = to;
 
-        _generateAndPersistNewBondInfo(tokenId, newPrice, bondAmount);
+        BondInfo storage bondInfoRef = _bondInfosAtLastCheckpoint[tokenId];
+
+        _persistNewBondInfo(bondInfoRef, newPrice, bondAmount);
         erc20ToUse.transferFrom(payer, address(this), bondAmount);
-        emit Transfer(from, to, tokenId, newPrice);
+        emit Transfer(from, to, tokenId);
+        emit NewPriceSet(to, tokenId, newPrice);
     }
 
     function setEscrowIntent(
@@ -616,7 +642,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         uint256 price,
         uint256 bond,
         uint256 expiry
-    ) external {
+    ) external override {
         require(
             ownerOf(tokenId) != msg.sender,
             "Cannot set an escrow for a token you own"

@@ -3,13 +3,9 @@
 pragma solidity ^0.8.0;
 
 import "./CommonPartialToken.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 
-struct DnaData {
-    uint248 dna;
-    uint8 specialId;
-}
-
-contract Sphinxes is CommonPartialToken {
+contract Sphinxes is CommonPartialToken, VRFConsumerBase {
     uint256 public constant sphinxPrice = 30000000000000000; //0.03 ETH
     uint256 public constant MAX_SPHINXES = 10000;
     uint256 public MAX_SPECIAL = 9;
@@ -23,31 +19,40 @@ contract Sphinxes is CommonPartialToken {
     // Token symbol
     string private _symbol;
     string internal baseURI;
+    uint256 internal fee;
+    bool revealed;
+    bytes32 internal keyHash;
+    event SphinxSeed(uint256 seed);
 
-    uint16[][NUM_TRAITS] private traitProbs;
-    mapping(uint256 => DnaData) tokenDna;
+    uint8[][NUM_TRAITS] private traitProbs;
+    uint256 seed = 0;
 
     constructor(
-        address currency,
-        address treasuryContractAddress,
+        // coordinator, Linkaddr, currency, treasuryContract
+        address[] memory addressesToSet,
+        bytes32 _keyHash,
         uint16 interestRateToSet,
-        uint16[] memory earsHats_p,
-        uint16[] memory mouth_p,
-        uint16[] memory eyes_p,
-        uint16[] memory attire_p,
-        uint16[] memory stance_p,
-        uint16[] memory item_p
-    ) CommonPartialToken(currency, treasuryContractAddress, interestRateToSet) {
+        uint8[][NUM_TRAITS] memory traits_p
+    )
+        CommonPartialToken(
+            addressesToSet[2],
+            addressesToSet[3],
+            interestRateToSet
+        )
+        VRFConsumerBase(addressesToSet[0], addressesToSet[1])
+    {
         saleIsActive = false;
-        traitProbs[0] = earsHats_p;
-        traitProbs[1] = mouth_p;
-        traitProbs[2] = eyes_p;
-        traitProbs[3] = attire_p;
-        traitProbs[4] = stance_p;
-        traitProbs[5] = item_p;
+        traitProbs[0] = traits_p[0];
+        traitProbs[1] = traits_p[1];
+        traitProbs[2] = traits_p[2];
+        traitProbs[3] = traits_p[3];
+        traitProbs[4] = traits_p[4];
+        traitProbs[5] = traits_p[5];
         nonce = 15;
         _name = "Sphinxes";
         _symbol = "SPS";
+        fee = 2 * 10**18; // 2 LINK token
+        keyHash = _keyHash[2];
     }
 
     function mintSphinx(
@@ -76,43 +81,46 @@ contract Sphinxes is CommonPartialToken {
         uint256 bond
     ) private {
         for (uint256 i = 0; i < numberOfTokens; i++) {
-            tokenDna[tokenId] = DnaData(
-                uint248(
-                    uint256(
-                        keccak256(
-                            abi.encodePacked(
-                                nonce++,
-                                block.difficulty,
-                                block.timestamp,
-                                sender
-                            )
-                        )
-                    )
-                ),
-                //will be set after mint sells out
-                0
-            );
             _mint(sender, tokenId, price, bond);
         }
     }
 
+    function reveal() public onlyOwner {
+        require(!revealed);
+        require(LINK.balanceOf(address(this)) >= fee);
+        requestRandomness(keyHash, fee);
+        revealed = true;
+    }
+
+    /**
+     * @dev receive random number from chainlink
+     * @notice random number will greater than zero
+     */
+    function fulfillRandomness(bytes32 requestId, uint256 randomNumber)
+        internal
+        override
+    {
+        if (randomNumber > 0) seed = randomNumber;
+        else seed = 1;
+        emit SphinxSeed(seed);
+    }
+
     function getTraitsForToken(uint256 tokenId) external view {
+        require(seed > 0, "Seed hasnt been set.");
+        require(
+            _exists(tokenId),
+            "Cannot get the attributes for non-existent token."
+        );
         uint8[] memory traits = new uint8[](NUM_TRAITS);
-        DnaData memory tokenData = tokenDna[tokenId];
-        uint248 dna = tokenData.dna;
-        require(dna > 0);
+        uint256 dna = uint256(keccak256(abi.encodePacked(seed, tokenId)));
         for (uint256 i = 0; i < NUM_TRAITS; i++) {
-            if (tokenData.specialId > 0) {
-                traits[i] = uint8(100 + tokenData.specialId);
-            } else {
-                uint16 currentTraitDna = uint16(dna);
-                traits[i] = _determineTrait(currentTraitDna, traitProbs[i]);
-                dna >>= 16;
-            }
+            uint8 currentTraitDna = uint8(dna);
+            traits[i] = _determineTrait(currentTraitDna, traitProbs[i]);
+            dna >>= 8;
         }
     }
 
-    function _determineTrait(uint16 traitDna, uint16[] memory trait_p)
+    function _determineTrait(uint8 traitDna, uint8[] memory trait_p)
         private
         pure
         returns (uint8)
