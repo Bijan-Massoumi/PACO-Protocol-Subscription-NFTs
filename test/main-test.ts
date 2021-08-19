@@ -26,7 +26,14 @@ let tokenContract: Contract;
 let tokenSigner: JsonRpcSigner;
 let owner: SignerWithAddress;
 let addr1: SignerWithAddress;
-let attributeProbs = [[65535], [65535], [65535], [65535], [65535], [65535]];
+let attributeProbs = [[255], [255], [255], [255], [255], [255]];
+let addressesToSet = [
+  '0xf0d54349aDdcf704F77AE15b96510dEA15cb7952',
+  '0x514910771AF9Ca656af840dff83E8264EcF986CA',
+  tokenAddress,
+];
+const keyhash =
+  '0xAA77729D3466CA35AE8D28B3BBAC7CC36A5031EFDC430821C02BC31A238AF445';
 
 const getBalance = async (signer: SignerWithAddress | JsonRpcSigner) => {
   return printNumber(await sphinxContract.balanceOf(await signer.getAddress()));
@@ -40,11 +47,12 @@ describe('Common Partial Ownership Contract', function () {
     const treasuryContractFactory = await ethers.getContractFactory('Treasury');
     treasuryContract = (await treasuryContractFactory.deploy()) as Treasury;
 
+    addressesToSet.push(treasuryContract.address);
     sphinxContract = (await myContractFactory.deploy(
-      tokenAddress,
-      treasuryContract.address,
+      addressesToSet,
+      keyhash,
       interestRate,
-      ...attributeProbs
+      attributeProbs
     )) as Sphinxes;
     await sphinxContract.deployed();
     await treasuryContract.initialize(sphinxContract.address, tokenAddress);
@@ -156,9 +164,7 @@ describe('Common Partial Ownership Contract', function () {
         sphinxContract
           .connect(tokenSigner)
           .alterStatedPriceAndBond(tokenId, 0, oneRai.mul(1009))
-      ).to.be.revertedWith(
-        'Cannot update price or bond unless > 10% of statedPrice is posted in bond.'
-      );
+      ).to.be.revertedWith('Insufficient bond');
     });
   });
   describe(`Interest is calculated as expected`, async () => {
@@ -285,6 +291,50 @@ describe('Common Partial Ownership Contract', function () {
       expect(
         balanceAfter < balanceBefore.sub(depreciatedPrice) &&
           balanceAfter > balanceBefore.sub(firstPrice)
+      );
+    });
+  });
+
+  describe(`Testing transfer`, async () => {
+    let tokenId: number;
+    before(async () => {
+      const ownedTokens = await sphinxContract.getTokenIdsForAddress(
+        addr1.address
+      );
+      tokenId = ownedTokens[0].toNumber();
+    });
+    it(`transfer fails`, async () => {
+      await expect(
+        sphinxContract
+          .connect(addr1)
+          .transferFrom(addr1.address, await tokenSigner.getAddress(), tokenId)
+      ).to.be.revertedWith('Intent to receive expired.');
+    });
+    it('Can signal intent to receive', async () => {
+      const block = await ethers.provider.getBlock(
+        await ethers.provider.getBlockNumber()
+      );
+      const currTime = block.timestamp;
+      await sphinxContract
+        .connect(tokenSigner)
+        .setEscrowIntent(
+          tokenId,
+          oneRai.mul(5),
+          oneRai.mul(1),
+          currTime + 100000
+        );
+      const res = await sphinxContract.getIntent(
+        tokenId,
+        await tokenSigner.getAddress()
+      );
+      expect(res.expiry.toNumber()).equal(currTime + 100000);
+    });
+    it('Can transfer ownership', async () => {
+      await sphinxContract
+        .connect(addr1)
+        .transferFrom(addr1.address, await tokenSigner.getAddress(), tokenId);
+      expect(await sphinxContract.ownerOf(tokenId)).equal(
+        await tokenSigner.getAddress()
       );
     });
   });

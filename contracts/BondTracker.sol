@@ -48,11 +48,11 @@ contract BondTracker is TreasuryOwnable {
             return (0, 0, lastBondInfo.liquidationStartedAt);
         }
         uint256 totalInterest = InterestUtils
-        ._calculateInterestSinceLastCheckIn(
-            lastBondInfo.statedPrice,
-            lastBondInfo.lastModifiedAt,
-            interestRate
-        );
+            ._calculateInterestSinceLastCheckIn(
+                lastBondInfo.statedPrice,
+                lastBondInfo.lastModifiedAt,
+                interestRate
+            );
 
         if (totalInterest > lastBondInfo.bondRemaining) {
             return (
@@ -126,7 +126,7 @@ contract BondTracker is TreasuryOwnable {
     ) internal {
         require(
             newBondAmount >= (newStatedPrice * minimumBond) / 10000,
-            " > 10% of statedPrice must be posted in bond."
+            "Insufficient bond"
         );
         bondInfoRef.statedPrice = newStatedPrice;
         bondInfoRef.bondRemaining = newBondAmount;
@@ -140,6 +140,7 @@ contract BondTracker is TreasuryOwnable {
         uint256 bond,
         uint256 expiry
     ) internal {
+        require(expiry > block.timestamp);
         escrowIntentToReceive[msg.sender][tokenId] = EscrowIntentToReceive(
             price,
             bond,

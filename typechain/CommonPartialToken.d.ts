@@ -29,6 +29,7 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     "clubAddress()": FunctionFragment;
     "getApproved(uint256)": FunctionFragment;
     "getBond(uint256)": FunctionFragment;
+    "getIntent(uint256,address)": FunctionFragment;
     "getLiquidationStartedAt(uint256)": FunctionFragment;
     "getPrice(uint256)": FunctionFragment;
     "getStatedPrice(uint256)": FunctionFragment;
@@ -84,6 +85,10 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
   encodeFunctionData(
     functionFragment: "getBond",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getIntent",
+    values: [BigNumberish, string]
   ): string;
   encodeFunctionData(
     functionFragment: "getLiquidationStartedAt",
@@ -200,6 +205,7 @@ interface CommonPartialTokenInterface extends ethers.utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "getBond", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "getIntent", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "getLiquidationStartedAt",
     data: BytesLike
@@ -395,6 +401,20 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<[BigNumber]>;
 
+    getIntent(
+      tokenId: BigNumberish,
+      receiver: string,
+      overrides?: CallOverrides
+    ): Promise<
+      [
+        [BigNumber, BigNumber, BigNumber] & {
+          statedPrice: BigNumber;
+          bondToPost: BigNumber;
+          expiry: BigNumber;
+        }
+      ]
+    >;
+
     getLiquidationStartedAt(
       tokenId: BigNumberish,
       overrides?: CallOverrides
@@ -569,6 +589,18 @@ export class CommonPartialToken extends BaseContract {
     overrides?: CallOverrides
   ): Promise<BigNumber>;
 
+  getIntent(
+    tokenId: BigNumberish,
+    receiver: string,
+    overrides?: CallOverrides
+  ): Promise<
+    [BigNumber, BigNumber, BigNumber] & {
+      statedPrice: BigNumber;
+      bondToPost: BigNumber;
+      expiry: BigNumber;
+    }
+  >;
+
   getLiquidationStartedAt(
     tokenId: BigNumberish,
     overrides?: CallOverrides
@@ -733,6 +765,18 @@ export class CommonPartialToken extends BaseContract {
       _tokenId: BigNumberish,
       overrides?: CallOverrides
     ): Promise<BigNumber>;
+
+    getIntent(
+      tokenId: BigNumberish,
+      receiver: string,
+      overrides?: CallOverrides
+    ): Promise<
+      [BigNumber, BigNumber, BigNumber] & {
+        statedPrice: BigNumber;
+        bondToPost: BigNumber;
+        expiry: BigNumber;
+      }
+    >;
 
     getLiquidationStartedAt(
       tokenId: BigNumberish,
@@ -951,6 +995,12 @@ export class CommonPartialToken extends BaseContract {
       overrides?: CallOverrides
     ): Promise<BigNumber>;
 
+    getIntent(
+      tokenId: BigNumberish,
+      receiver: string,
+      overrides?: CallOverrides
+    ): Promise<BigNumber>;
+
     getLiquidationStartedAt(
       tokenId: BigNumberish,
       overrides?: CallOverrides
@@ -1123,6 +1173,12 @@ export class CommonPartialToken extends BaseContract {
 
     getBond(
       _tokenId: BigNumberish,
+      overrides?: CallOverrides
+    ): Promise<PopulatedTransaction>;
+
+    getIntent(
+      tokenId: BigNumberish,
+      receiver: string,
       overrides?: CallOverrides
     ): Promise<PopulatedTransaction>;
 

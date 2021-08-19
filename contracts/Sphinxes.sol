@@ -52,7 +52,7 @@ contract Sphinxes is CommonPartialToken, VRFConsumerBase {
         _name = "Sphinxes";
         _symbol = "SPS";
         fee = 2 * 10**18; // 2 LINK token
-        keyHash = _keyHash[2];
+        keyHash = _keyHash;
     }
 
     function mintSphinx(

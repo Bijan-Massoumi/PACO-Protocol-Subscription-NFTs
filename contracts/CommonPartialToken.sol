@@ -585,6 +585,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
             currentOwnerAddress == from,
             "ERC721: transfer of token that is not own"
         );
+        require(to != address(0), "ERC721: transfer to the zero address");
 
         uint256 bondRemaining;
         uint256 interestToReap;
@@ -643,11 +644,21 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
         uint256 bond,
         uint256 expiry
     ) external override {
+        require(_exists(tokenId));
         require(
             ownerOf(tokenId) != msg.sender,
             "Cannot set an escrow for a token you own"
         );
+
         _setEscrowIntent(tokenId, price, bond, expiry);
+    }
+
+    function getIntent(uint256 tokenId, address receiver)
+        external
+        view
+        returns (EscrowIntentToReceive memory)
+    {
+        return escrowIntentToReceive[receiver][tokenId];
     }
 
     function _checkOnERC721Received(
