@@ -13,14 +13,6 @@ import * as Contracts from ".";
 declare module "hardhat/types/runtime" {
   interface HardhatEthersHelpers extends HardhatEthersHelpersBase {
     getContractFactory(
-      name: "LinkTokenInterface",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.LinkTokenInterface__factory>;
-    getContractFactory(
-      name: "VRFConsumerBase",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.VRFConsumerBase__factory>;
-    getContractFactory(
       name: "Ownable",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Ownable__factory>;
@@ -49,37 +41,86 @@ declare module "hardhat/types/runtime" {
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.BondTracker__factory>;
     getContractFactory(
-      name: "CommonPartiallyOwned",
+      name: "IPaCoToken",
       signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.CommonPartiallyOwned__factory>;
+    ): Promise<Contracts.IPaCoToken__factory>;
     getContractFactory(
-      name: "CommonPartialToken",
+      name: "PaCoExample",
       signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.CommonPartialToken__factory>;
+    ): Promise<Contracts.PaCoExample__factory>;
     getContractFactory(
-      name: "ERC20",
+      name: "PaCoToken",
       signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.ERC20__factory>;
+    ): Promise<Contracts.PaCoToken__factory>;
     getContractFactory(
-      name: "CommonPartiallyOwnedEnumerable",
+      name: "PaCoTokenEnumerable",
       signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.CommonPartiallyOwnedEnumerable__factory>;
-    getContractFactory(
-      name: "TreasuryOwnable",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.TreasuryOwnable__factory>;
-    getContractFactory(
-      name: "Sphinxes",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.Sphinxes__factory>;
-    getContractFactory(
-      name: "SphinxContract",
-      signerOrOptions?: ethers.Signer | FactoryOptions
-    ): Promise<Contracts.SphinxContract__factory>;
+    ): Promise<Contracts.PaCoTokenEnumerable__factory>;
     getContractFactory(
       name: "Treasury",
       signerOrOptions?: ethers.Signer | FactoryOptions
     ): Promise<Contracts.Treasury__factory>;
+
+    getContractAt(
+      name: "Ownable",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.Ownable>;
+    getContractAt(
+      name: "IERC20",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.IERC20>;
+    getContractAt(
+      name: "IERC721Metadata",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.IERC721Metadata>;
+    getContractAt(
+      name: "IERC721",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.IERC721>;
+    getContractAt(
+      name: "IERC721Receiver",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.IERC721Receiver>;
+    getContractAt(
+      name: "IERC165",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.IERC165>;
+    getContractAt(
+      name: "BondTracker",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.BondTracker>;
+    getContractAt(
+      name: "IPaCoToken",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.IPaCoToken>;
+    getContractAt(
+      name: "PaCoExample",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.PaCoExample>;
+    getContractAt(
+      name: "PaCoToken",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.PaCoToken>;
+    getContractAt(
+      name: "PaCoTokenEnumerable",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.PaCoTokenEnumerable>;
+    getContractAt(
+      name: "Treasury",
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<Contracts.Treasury>;
 
     // default types
     getContractFactory(
@@ -91,5 +132,10 @@ declare module "hardhat/types/runtime" {
       bytecode: ethers.utils.BytesLike,
       signer?: ethers.Signer
     ): Promise<ethers.ContractFactory>;
+    getContractAt(
+      nameOrAbi: string | any[],
+      address: string,
+      signer?: ethers.Signer
+    ): Promise<ethers.Contract>;
   }
 }

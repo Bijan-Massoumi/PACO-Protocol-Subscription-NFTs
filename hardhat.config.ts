@@ -1,7 +1,7 @@
-import '@nomiclabs/hardhat-waffle';
-import '@typechain/hardhat';
-import '@nomiclabs/hardhat-ethers';
-import secret from './secrets';
+import "@nomiclabs/hardhat-waffle";
+import "@typechain/hardhat";
+import "@nomiclabs/hardhat-ethers";
+import secret from "./secrets";
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
 
@@ -13,7 +13,7 @@ import secret from './secrets';
  */
 module.exports = {
   solidity: {
-    version: '0.8.0',
+    version: "0.8.7",
     settings: {
       optimizer: {
         enabled: true,
@@ -25,7 +25,7 @@ module.exports = {
     hardhat: {
       forking: {
         url: secret.url,
-        blockNumber: secret.blockNumber,
+        blockNumber: 14060675,
       },
     },
   },

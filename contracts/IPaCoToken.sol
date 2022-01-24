@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 //inspired by ERC721 and ERC721Enumerable
-interface CommonPartiallyOwned {
+interface IPaCoToken {
     event Transfer(address from, address to, uint256 _tokenId);
     event NewPriceSet(address owner, uint256 tokenId, uint256 price);
 

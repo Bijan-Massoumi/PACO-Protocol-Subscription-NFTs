@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "./CommonPartialInterface.sol";
+import "./IPaCoToken.sol";
 
-abstract contract CommonPartiallyOwnedEnumerable is CommonPartiallyOwned {
+abstract contract PaCoTokenEnumerable is IPaCoToken {
     // Mapping from owner to list of owned token IDs
     mapping(address => mapping(uint256 => uint256)) internal _ownedTokens;
 

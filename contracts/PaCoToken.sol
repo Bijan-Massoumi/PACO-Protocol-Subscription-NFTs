@@ -3,20 +3,15 @@ pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "./CommonPartialTokenEnumerable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./PaCoTokenEnumerable.sol";
 import "./BondTracker.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
-interface ERC20 {
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-}
 
-contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
+
+contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     using Address for address;
     // Mapping from token ID to owner address
     mapping(uint256 => address) private _owners;
@@ -31,15 +26,17 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
     uint256 interestToSendToTreasury;
-    ERC20 erc20ToUse;
+    IERC20 erc20ToUse;
+    address withdrawAddress;
 
     constructor(
         address erc20Address,
-        address treasuryContractToSet,
+        address _withdrawAddress,
         uint16 interestRateToSet
-    ) BondTracker(treasuryContractToSet) {
-        erc20ToUse = ERC20(erc20Address);
+    ) Ownable() {
+        erc20ToUse = IERC20(erc20Address);
         interestRate = interestRateToSet;
+        withdrawAddress = _withdrawAddress;
     }
 
     function balanceOf(address owner)
@@ -211,7 +208,7 @@ contract CommonPartialToken is CommonPartiallyOwnedEnumerable, BondTracker {
     function moveAccumulatedFundsToTreasury() public {
         erc20ToUse.transferFrom(
             address(this),
-            _treasury,
+            withdrawAddress,
             interestToSendToTreasury
         );
         interestToSendToTreasury = 0;

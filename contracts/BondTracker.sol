@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 import "hardhat/console.sol";
 import "./InterestUtils.sol";
-import "./OwnershipManager.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 struct BondInfo {
     uint256 statedPrice;
@@ -17,7 +17,7 @@ struct EscrowIntentToReceive {
     uint256 expiry;
 }
 
-contract BondTracker is TreasuryOwnable {
+abstract contract BondTracker is Ownable {
     mapping(uint256 => BondInfo) internal _bondInfosAtLastCheckpoint;
     mapping(address => uint256) internal _bondToBeReturnedToAddress;
     mapping(address => mapping(uint256 => EscrowIntentToReceive)) escrowIntentToReceive;
@@ -29,7 +29,6 @@ contract BondTracker is TreasuryOwnable {
     uint16 internal interestRate;
     uint256 halfLife = 172800;
 
-    constructor(address treasuryContract) TreasuryOwnable(treasuryContract) {}
 
     function _getCurrentBondInfoForToken(BondInfo memory lastBondInfo)
         internal
