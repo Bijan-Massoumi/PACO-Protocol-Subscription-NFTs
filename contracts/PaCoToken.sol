@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./PaCoTokenEnumerable.sol";
@@ -25,17 +24,16 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     // Mapping from owner to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
-    uint256 interestToSendToTreasury;
+    uint256 feesToWithdraw;
     IERC20 erc20ToUse;
     address withdrawAddress;
 
     constructor(
         address erc20Address,
         address _withdrawAddress,
-        uint16 interestRateToSet
-    ) Ownable() {
+        uint16 _selfAssessmentRate
+    ) Ownable() BondTracker(_selfAssessmentRate) {
         erc20ToUse = IERC20(erc20Address);
-        interestRate = interestRateToSet;
         withdrawAddress = _withdrawAddress;
     }
 
@@ -72,19 +70,19 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             "can't claim your own token."
         );
 
-        uint256 interestToReap;
+        uint256 feesToReap;
         uint256 liquidationStartedAt;
         uint256 bondRemaining;
 
         BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
         (
             bondRemaining,
-            interestToReap,
+            feesToReap,
             liquidationStartedAt
         ) = _getCurrentBondInfoForToken(currentOwnersBond);
 
         if (liquidationStartedAt != 0) {
-            uint256 buyPrice = InterestUtils.getLiquidationPrice(
+            uint256 buyPrice = SafUtils.getLiquidationPrice(
                 currentOwnersBond.statedPrice,
                 block.timestamp - liquidationStartedAt,
                 halfLife
@@ -99,7 +97,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         }
 
         _bondToBeReturnedToAddress[currentOwnerAddress] += bondRemaining;
-        interestToSendToTreasury += interestToReap;
+        feesToWithdraw += feesToReap;
 
         _swapAndPostBond(
             currentOwnerAddress,
@@ -117,14 +115,14 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         override
         returns (bool)
     {
-        uint256 interestToReap;
+        uint256 feesToReap;
         uint256 liquidationStartedAt;
         uint256 bondRemaining;
 
         BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
         (
             bondRemaining,
-            interestToReap,
+            feesToReap,
             liquidationStartedAt
         ) = _getCurrentBondInfoForToken(currentOwnersBond);
         return liquidationStartedAt != 0;
@@ -152,11 +150,11 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             _isApprovedOrOwner(msg.sender, _tokenId),
             "ERC721: transfer caller is not owner nor approved"
         );
-        uint256 interestToReap;
+        uint256 feesToReap;
         uint256 amountToTransfer;
         BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[_tokenId];
         uint256 lastPrice = lastBondInfo.statedPrice;
-        (interestToReap, amountToTransfer) = _refreshAndModifyExistingBondInfo(
+        (feesToReap, amountToTransfer) = _refreshAndModifyExistingBondInfo(
             lastBondInfo,
             bondDelta,
             priceDelta
@@ -169,7 +167,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             );
         }
 
-        interestToSendToTreasury += interestToReap;
+        feesToWithdraw += feesToReap;
         if (amountToTransfer > 0)
             erc20ToUse.transferFrom(
                 ownerOf(_tokenId),
@@ -178,40 +176,40 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             );
     }
 
-    function reapInterestForTokenIds(uint256[] calldata tokenIds) external {
-        uint256 netInterest = 0;
-        uint256 interestToReap;
+    function reapSafForTokenIds(uint256[] calldata tokenIds) external {
+        uint256 netFees = 0;
+        uint256 feesToReap;
         uint256 bondRemaining;
         uint256 liquidationStartedAt;
         for (uint256 i = 0; i < tokenIds.length; i++) {
             require(
                 _exists(tokenIds[i]),
-                "token to reap interest for doesnt exist"
+                "token to reap fees for doesnt exist"
             );
             BondInfo storage currBondInfo = _bondInfosAtLastCheckpoint[
                 tokenIds[i]
             ];
             (
                 bondRemaining,
-                interestToReap,
+                feesToReap,
                 liquidationStartedAt
             ) = _getCurrentBondInfoForToken(currBondInfo);
             currBondInfo.bondRemaining = bondRemaining;
             currBondInfo.lastModifiedAt = block.timestamp;
             currBondInfo.liquidationStartedAt = liquidationStartedAt;
-            netInterest += interestToReap;
+            netFees += feesToReap;
         }
-        interestToSendToTreasury += netInterest;
-        moveAccumulatedFundsToTreasury();
+        feesToWithdraw += netFees;
+        withdrawAccumulatedFunds();
     }
 
-    function moveAccumulatedFundsToTreasury() public {
+    function withdrawAccumulatedFunds() public {
         erc20ToUse.transferFrom(
             address(this),
             withdrawAddress,
-            interestToSendToTreasury
+            feesToWithdraw
         );
-        interestToSendToTreasury = 0;
+        feesToWithdraw = 0;
     }
 
     /**
@@ -360,7 +358,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         (, , liquidationStartedAt) = _getCurrentBondInfoForToken(bondInfo);
         if (liquidationStartedAt != 0) {
             return
-                InterestUtils.getLiquidationPrice(
+                SafUtils.getLiquidationPrice(
                     bondInfo.statedPrice,
                     block.timestamp - liquidationStartedAt,
                     halfLife
@@ -420,9 +418,9 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     ) internal virtual {
         require(
             to != address(0),
-            "CommonPartialToken: mint to the zero address"
+            "PaCo: mint to the zero address"
         );
-        require(!_exists(tokenId), "CommonPartialToken: token already minted");
+        require(!_exists(tokenId), "Token already minted");
 
         _beforeTokenTransfer(address(0), to, tokenId);
         _balances[to] += 1;
@@ -585,17 +583,17 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         require(to != address(0), "ERC721: transfer to the zero address");
 
         uint256 bondRemaining;
-        uint256 interestToReap;
+        uint256 feesToReap;
         EscrowIntentToReceive memory res = escrowIntentToReceive[to][tokenId];
         require(res.expiry > block.timestamp, "Intent to receive expired.");
 
         BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
-        (bondRemaining, interestToReap, ) = _getCurrentBondInfoForToken(
+        (bondRemaining, feesToReap, ) = _getCurrentBondInfoForToken(
             currentOwnersBond
         );
 
         _bondToBeReturnedToAddress[currentOwnerAddress] += bondRemaining;
-        interestToSendToTreasury += interestToReap;
+        feesToWithdraw += feesToReap;
 
         _swapAndPostBond(
             currentOwnerAddress,

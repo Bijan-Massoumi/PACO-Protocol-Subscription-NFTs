@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import "hardhat/console.sol";
-import "./InterestUtils.sol";
+import "./SafUtils.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 struct BondInfo {
@@ -26,16 +25,19 @@ abstract contract BondTracker is Ownable {
     // must be convered by bond
     uint16 internal minimumBond = 1000;
     //set by constructor
-    uint16 internal interestRate;
+    uint16 internal selfAssessmentRate;
     uint256 halfLife = 172800;
 
+    constructor(uint16 _selfAssessmentRate){
+        selfAssessmentRate = _selfAssessmentRate;
+    }
 
     function _getCurrentBondInfoForToken(BondInfo memory lastBondInfo)
         internal
         view
         returns (
             uint256 bondRemaining,
-            uint256 interestToReap,
+            uint256 feesToReap,
             uint256 liquidationStartedAt
         )
     {
@@ -46,35 +48,35 @@ abstract contract BondTracker is Ownable {
         ) {
             return (0, 0, lastBondInfo.liquidationStartedAt);
         }
-        uint256 totalInterest = InterestUtils
-            ._calculateInterestSinceLastCheckIn(
+        uint256 totalFee = SafUtils
+            ._calculateSafSinceLastCheckIn(
                 lastBondInfo.statedPrice,
                 lastBondInfo.lastModifiedAt,
-                interestRate
+                selfAssessmentRate
             );
 
-        if (totalInterest > lastBondInfo.bondRemaining) {
+        if (totalFee > lastBondInfo.bondRemaining) {
             return (
                 0,
-                totalInterest - lastBondInfo.bondRemaining,
-                InterestUtils._getTimeLiquidationBegan(
+                totalFee - lastBondInfo.bondRemaining,
+                SafUtils._getTimeLiquidationBegan(
                     lastBondInfo.statedPrice,
                     lastBondInfo.lastModifiedAt,
-                    interestRate,
+                    selfAssessmentRate,
                     lastBondInfo.bondRemaining
                 )
             );
         } else {
             return (
-                lastBondInfo.bondRemaining - totalInterest,
-                totalInterest,
+                lastBondInfo.bondRemaining - totalFee,
+                totalFee,
                 lastBondInfo.liquidationStartedAt
             );
         }
     }
 
-    function setInterestRate(uint16 newInterestRate) external onlyOwner {
-        interestRate = newInterestRate;
+    function setselfAssessmentRate(uint16 newSelfAssessmentRate) external onlyOwner {
+        selfAssessmentRate = newSelfAssessmentRate;
     }
 
     function setHalfLife(uint16 newHalfLife) external onlyOwner {
@@ -89,12 +91,12 @@ abstract contract BondTracker is Ownable {
         BondInfo storage _bondInfoAtLastCheckpoint,
         int256 _bondDelta,
         int256 _statedPriceDelta
-    ) internal returns (uint256 interestToReap, uint256 amountToTransfer) {
+    ) internal returns (uint256 feesToReap, uint256 amountToTransfer) {
         uint256 bondRemaining;
         uint256 liquidationStartedAt;
         (
             bondRemaining,
-            interestToReap,
+            feesToReap,
             liquidationStartedAt
         ) = _getCurrentBondInfoForToken(_bondInfoAtLastCheckpoint);
 

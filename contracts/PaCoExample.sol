@@ -21,12 +21,12 @@ contract PaCoExample is PaCoToken {
     constructor(
         address tokenAddress,
         address withdrawAddress,
-        uint16 interestRateToSet
+        uint16 selfAssessmentRate
     )
         PaCoToken(
             tokenAddress,
             withdrawAddress,
-            interestRateToSet
+            selfAssessmentRate
         )
     {
         _name = "Example";
