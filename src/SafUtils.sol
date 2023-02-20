@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-import "hardhat/console.sol";
+pragma solidity 0.8.18;
 
 library SafUtils {
     function _calculateSafSinceLastCheckIn(
@@ -9,9 +8,7 @@ library SafUtils {
         uint16 feeRate
     ) internal view returns (uint256 feeToReap) {
         feeToReap =
-            (feeRate *
-                totalStatedPrice *
-                (block.timestamp - lastCheckInAt)) /
+            (feeRate * totalStatedPrice * (block.timestamp - lastCheckInAt)) /
             (31536000 * 10000);
     }
 

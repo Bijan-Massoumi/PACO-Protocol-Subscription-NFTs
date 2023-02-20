@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.18;
+
 import "./SafUtils.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -28,12 +29,12 @@ abstract contract BondTracker is Ownable {
     uint16 internal selfAssessmentRate;
     uint256 halfLife = 172800;
 
-    constructor(uint16 _selfAssessmentRate){
+    constructor(uint16 _selfAssessmentRate) {
         selfAssessmentRate = _selfAssessmentRate;
     }
 
     function getLiquidationStartedAt(uint256 tokenId)
-        public 
+        public
         view
         returns (uint256)
     {
@@ -45,8 +46,10 @@ abstract contract BondTracker is Ownable {
         return liquidationStartedAt;
     }
 
-
-    function setSelfAssessmentRate(uint16 newSelfAssessmentRate) external onlyOwner {
+    function setSelfAssessmentRate(uint16 newSelfAssessmentRate)
+        external
+        onlyOwner
+    {
         selfAssessmentRate = newSelfAssessmentRate;
     }
 
@@ -74,12 +77,11 @@ abstract contract BondTracker is Ownable {
         ) {
             return (0, 0, lastBondInfo.liquidationStartedAt);
         }
-        uint256 totalFee = SafUtils
-            ._calculateSafSinceLastCheckIn(
-                lastBondInfo.statedPrice,
-                lastBondInfo.lastModifiedAt,
-                selfAssessmentRate
-            );
+        uint256 totalFee = SafUtils._calculateSafSinceLastCheckIn(
+            lastBondInfo.statedPrice,
+            lastBondInfo.lastModifiedAt,
+            selfAssessmentRate
+        );
 
         if (totalFee > lastBondInfo.bondRemaining) {
             return (

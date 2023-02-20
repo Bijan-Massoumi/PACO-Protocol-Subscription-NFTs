@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.18;
 
 import "./PaCoToken.sol";
 
@@ -22,13 +22,7 @@ contract PaCoExample is PaCoToken {
         address tokenAddress,
         address withdrawAddress,
         uint16 selfAssessmentRate
-    )
-        PaCoToken(
-            tokenAddress,
-            withdrawAddress,
-            selfAssessmentRate
-        )
-    {
+    ) PaCoToken(tokenAddress, withdrawAddress, selfAssessmentRate) {
         _name = "Example";
         _symbol = "EXE";
     }

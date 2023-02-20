@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.18;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -9,12 +9,10 @@ import "./BondTracker.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
-
-
 contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     using Address for address;
     using SafeERC20 for IERC20;
-    
+
     // Mapping from token ID to owner address
     mapping(uint256 => address) private _owners;
 
@@ -32,14 +30,11 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     address withdrawAddress;
 
     constructor(
-        address erc20Address,
+        address _erc20Address,
         address _withdrawAddress,
         uint16 _selfAssessmentRate
-    ) 
-    Ownable() 
-    BondTracker(_selfAssessmentRate)
-    {
-        bondToken = IERC20(erc20Address);
+    ) Ownable() BondTracker(_selfAssessmentRate) {
+        bondToken = IERC20(_erc20Address);
         withdrawAddress = _withdrawAddress;
     }
 
@@ -73,7 +68,11 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
                 block.timestamp - liquidationStartedAt,
                 halfLife
             );
-            bondToken.safeTransferFrom(msg.sender, currentOwnerAddress, buyPrice);
+            bondToken.safeTransferFrom(
+                msg.sender,
+                currentOwnerAddress,
+                buyPrice
+            );
         } else {
             bondToken.safeTransferFrom(
                 msg.sender,
@@ -105,7 +104,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         return liquidationStartedAt != 0;
     }
 
-
     function alterStatedPriceAndBond(
         uint256 _tokenId,
         int256 bondDelta,
@@ -115,30 +113,45 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             _isApprovedOrOwner(msg.sender, _tokenId),
             "ERC721: transfer caller is not owner nor approved"
         );
-        uint256 feesToReap;
-        uint256 amountToTransfer;
-        BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[_tokenId];
-        uint256 lastPrice = lastBondInfo.statedPrice;
-        (feesToReap, amountToTransfer) = _refreshAndModifyExistingBondInfo(
-            lastBondInfo,
-            bondDelta,
-            priceDelta
-        );
-        if (lastPrice != lastBondInfo.statedPrice) {
-            emit NewPriceSet(
-                ownerOf(_tokenId),
-                _tokenId,
-                lastBondInfo.statedPrice
-            );
-        }
+        _alterStatedPriceAndBond(_tokenId, bondDelta, priceDelta);
+    }
 
-        creatorFees += feesToReap;
-        if (amountToTransfer > 0)
-            bondToken.safeTransferFrom(
-                ownerOf(_tokenId),
-                address(this),
-                amountToTransfer
-            );
+    function increaseBond(uint256 tokenId, uint256 amount) external override {
+        require(
+            _isApprovedOrOwner(msg.sender, tokenId),
+            "ERC721: transfer caller is not owner nor approved"
+        );
+        _alterStatedPriceAndBond(tokenId, int256(amount), 0);
+    }
+
+    function decreaseBond(uint256 tokenId, uint256 amount) external override {
+        require(
+            _isApprovedOrOwner(msg.sender, tokenId),
+            "ERC721: transfer caller is not owner nor approved"
+        );
+        _alterStatedPriceAndBond(tokenId, -int256(amount), 0);
+    }
+
+    function increaseStatedPrice(uint256 tokenId, uint256 amount)
+        external
+        override
+    {
+        require(
+            _isApprovedOrOwner(msg.sender, tokenId),
+            "ERC721: transfer caller is not owner nor approved"
+        );
+        _alterStatedPriceAndBond(tokenId, 0, int256(amount));
+    }
+
+    function decreaseStatedPrice(uint256 tokenId, uint256 amount)
+        external
+        override
+    {
+        require(
+            _isApprovedOrOwner(msg.sender, tokenId),
+            "ERC721: transfer caller is not owner nor approved"
+        );
+        _alterStatedPriceAndBond(tokenId, 0, -int256(amount));
     }
 
     function withdrawBondRefund() external {
@@ -148,7 +161,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             _bondToBeReturnedToAddress[msg.sender]
         );
     }
-
 
     function reapSafForTokenIds(uint256[] calldata tokenIds) external {
         uint256 netFees = 0;
@@ -180,7 +192,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     function viewBondRefund(address addr) external view returns (uint256) {
         return _bondToBeReturnedToAddress[addr];
     }
-    
+
     function getBond(uint256 _tokenId)
         external
         view
@@ -273,11 +285,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
 
     function withdrawAccumulatedFunds() public {
         creatorFees = 0;
-        bondToken.safeTransferFrom(
-            address(this),
-            withdrawAddress,
-            creatorFees
-        );
+        bondToken.safeTransferFrom(address(this), withdrawAddress, creatorFees);
     }
 
     function balanceOf(address owner)
@@ -301,7 +309,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         require(owner != address(0), "owner query for nonexistent token");
         return owner;
     }
-
 
     /**
      * @dev See {PaCo-approve}.
@@ -328,10 +335,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         override
         returns (address)
     {
-        require(
-            _exists(tokenId),
-            "PaCo: approved query for nonexistent token"
-        );
+        require(_exists(tokenId), "PaCo: approved query for nonexistent token");
 
         return _tokenApprovals[tokenId];
     }
@@ -482,10 +486,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         uint256 initialStatedPrice,
         uint256 bondAmount
     ) internal virtual {
-        require(
-            to != address(0),
-            "PaCo: mint to the zero address"
-        );
+        require(to != address(0), "PaCo: mint to the zero address");
         require(!_exists(tokenId), "Token already minted");
 
         _beforeTokenTransfer(address(0), to, tokenId);
@@ -496,6 +497,37 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         require(bondToken.transferFrom(to, address(this), bondAmount));
         emit Transfer(address(0), to, tokenId);
         emit NewPriceSet(to, tokenId, initialStatedPrice);
+    }
+
+    function _alterStatedPriceAndBond(
+        uint256 _tokenId,
+        int256 bondDelta,
+        int256 priceDelta
+    ) internal {
+        uint256 feesToReap;
+        uint256 amountToTransfer;
+        BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[_tokenId];
+        uint256 lastPrice = lastBondInfo.statedPrice;
+        (feesToReap, amountToTransfer) = _refreshAndModifyExistingBondInfo(
+            lastBondInfo,
+            bondDelta,
+            priceDelta
+        );
+        if (lastPrice != lastBondInfo.statedPrice) {
+            emit NewPriceSet(
+                ownerOf(_tokenId),
+                _tokenId,
+                lastBondInfo.statedPrice
+            );
+        }
+
+        creatorFees += feesToReap;
+        if (amountToTransfer > 0)
+            bondToken.safeTransferFrom(
+                ownerOf(_tokenId),
+                address(this),
+                amountToTransfer
+            );
     }
 
     function _exists(uint256 tokenId) internal view virtual returns (bool) {
@@ -557,8 +589,12 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
 
         uint256 bondRemaining;
         uint256 feesToReap;
-        EscrowIntentToReceive memory recipientEscrowInfo = escrowIntentToReceive[to][tokenId];
-        require(recipientEscrowInfo.expiry > block.timestamp, "Intent to receive expired.");
+        EscrowIntentToReceive
+            memory recipientEscrowInfo = escrowIntentToReceive[to][tokenId];
+        require(
+            recipientEscrowInfo.expiry > block.timestamp,
+            "Intent to receive expired."
+        );
 
         BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
         (bondRemaining, feesToReap, ) = _getCurrentBondInfoForToken(
@@ -605,7 +641,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         emit Transfer(from, to, tokenId);
         emit NewPriceSet(to, tokenId, newPrice);
     }
-
 
     function _checkOnERC721Received(
         address from,

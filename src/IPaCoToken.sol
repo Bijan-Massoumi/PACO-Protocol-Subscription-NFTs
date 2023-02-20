@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.18;
 
 //inspired by ERC721 and ERC721Enumerable
 interface IPaCoToken {
@@ -113,6 +113,14 @@ interface IPaCoToken {
         int256 bondDelta,
         int256 priceDelta
     ) external;
+
+    function increaseBond(uint256 tokenId, uint256 amount) external;
+
+    function decreaseBond(uint256 tokenId, uint256 amount) external;
+
+    function increaseStatedPrice(uint256 tokenId, uint256 amount) external;
+
+    function decreaseStatedPrice(uint256 tokenId, uint256 amount) external;
 
     function isBeingLiquidated(uint256 tokenId) external view returns (bool);
 
