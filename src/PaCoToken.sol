@@ -106,8 +106,8 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
 
     function alterStatedPriceAndBond(
         uint256 _tokenId,
-        int256 bondDelta,
-        int256 priceDelta
+        int256 priceDelta,
+        int256 bondDelta
     ) external override {
         require(
             _isApprovedOrOwner(msg.sender, _tokenId),
