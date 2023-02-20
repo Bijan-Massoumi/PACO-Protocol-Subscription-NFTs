@@ -14,17 +14,17 @@ contract PacoAlterBondTest is TestPacoToken {
 
     function setUp() public override {
         super.setUp();
-        vm.prank(wethWhale);
+        vm.prank(tokenWhale);
         uint256 statedPrice = oneETH * 100;
         uint256 bond = oneETH * 11;
         paco.mint(1, statedPrice, bond);
-        uint256[] memory ownedTokens = paco.getTokenIdsForAddress(wethWhale);
+        uint256[] memory ownedTokens = paco.getTokenIdsForAddress(tokenWhale);
         mintedTokenId = ownedTokens[0];
         onchainBond = paco.getBond(mintedTokenId);
     }
 
     function testBondCanBeIncreased() public {
-        vm.prank(wethWhale);
+        vm.prank(tokenWhale);
         paco.increaseBond(mintedTokenId, oneETH * 2);
         //uint256 newBond = paco.getBond(mintedTokenId);
         //assertEq(newBond, onchainBond + oneETH * 2);

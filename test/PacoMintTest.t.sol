@@ -10,12 +10,12 @@ import "./utils/TestPacoToken.sol";
 
 contract PacoMintTest is TestPacoToken {
     function testSuccessfulMint() public {
-        vm.prank(wethWhale);
+        vm.prank(tokenWhale);
         uint256 statedPrice = oneETH * 100;
         uint256 bond = oneETH * 11;
         paco.mint(1, statedPrice, bond);
-        assertEq(paco.balanceOf(wethWhale), 1);
-        uint256[] memory ownedTokens = paco.getTokenIdsForAddress(wethWhale);
+        assertEq(paco.balanceOf(tokenWhale), 1);
+        uint256[] memory ownedTokens = paco.getTokenIdsForAddress(tokenWhale);
         assertEq(ownedTokens.length, 1);
         uint256 mintedTokenId = ownedTokens[0];
         vm.warp(startBlockTimestamp + 5000);
@@ -29,7 +29,7 @@ contract PacoMintTest is TestPacoToken {
     }
 
     function testFailMintTooLittleBond() public {
-        vm.prank(wethWhale);
+        vm.prank(tokenWhale);
         uint256 statedPrice = oneETH * 100;
         uint256 bond = oneETH * 9;
         paco.mint(1, statedPrice, bond);
