@@ -111,7 +111,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     ) external override {
         require(
             _isApprovedOrOwner(msg.sender, _tokenId),
-            "ERC721: transfer caller is not owner nor approved"
+            "ERC721: alterStatedPriceAndBond caller is not owner nor approved"
         );
         _alterStatedPriceAndBond(_tokenId, bondDelta, priceDelta);
     }
@@ -119,7 +119,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     function increaseBond(uint256 tokenId, uint256 amount) external override {
         require(
             _isApprovedOrOwner(msg.sender, tokenId),
-            "ERC721: transfer caller is not owner nor approved"
+            "PaCo: increaseBond caller is not owner nor approved"
         );
         _alterStatedPriceAndBond(tokenId, int256(amount), 0);
     }
@@ -127,7 +127,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     function decreaseBond(uint256 tokenId, uint256 amount) external override {
         require(
             _isApprovedOrOwner(msg.sender, tokenId),
-            "ERC721: transfer caller is not owner nor approved"
+            "PaCo: decreaseBond caller is not owner nor approved"
         );
         _alterStatedPriceAndBond(tokenId, -int256(amount), 0);
     }
@@ -138,7 +138,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     {
         require(
             _isApprovedOrOwner(msg.sender, tokenId),
-            "ERC721: transfer caller is not owner nor approved"
+            "PaCo: increaseStatedPrice caller is not owner nor approved"
         );
         _alterStatedPriceAndBond(tokenId, 0, int256(amount));
     }
@@ -149,7 +149,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     {
         require(
             _isApprovedOrOwner(msg.sender, tokenId),
-            "ERC721: transfer caller is not owner nor approved"
+            "PaCo: decreaseStatedPrice caller is not owner nor approved"
         );
         _alterStatedPriceAndBond(tokenId, 0, -int256(amount));
     }
