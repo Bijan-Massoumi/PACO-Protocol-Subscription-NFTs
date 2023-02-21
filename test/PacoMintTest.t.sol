@@ -19,13 +19,13 @@ contract PacoMintTest is TestPacoToken {
         assertEq(ownedTokens.length, 1);
         uint256 mintedTokenId = ownedTokens[0];
         vm.warp(startBlockTimestamp + 5000);
-        uint256 onchainBond = paco.getBond(mintedTokenId);
+        uint256 startOnchainBond = paco.getBond(mintedTokenId);
         uint256 feeCollected = SafUtils._calculateSafSinceLastCheckIn(
             statedPrice,
             startBlockTimestamp,
             feeRate
         );
-        assertEq(onchainBond, bond - feeCollected);
+        assertEq(startOnchainBond, bond - feeCollected);
     }
 
     function testFailMintTooLittleBond() public {

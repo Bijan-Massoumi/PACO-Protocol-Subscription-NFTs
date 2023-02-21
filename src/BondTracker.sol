@@ -124,13 +124,11 @@ abstract contract BondTracker is Ownable {
             newBond >= 0 && newStatedPrice >= 0,
             "bad values passed for delta values"
         );
-        uint256 vettedNewBond = uint256(newBond);
-        uint256 vettedStatedPrice = uint256(newStatedPrice);
 
         _persistNewBondInfo(
             _bondInfoAtLastCheckpoint,
-            vettedStatedPrice,
-            vettedNewBond
+            uint256(newStatedPrice),
+            uint256(newBond)
         );
 
         amountToTransfer = _bondDelta > 0 ? uint256(_bondDelta) : 0;

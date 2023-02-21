@@ -155,38 +155,15 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     }
 
     function withdrawBondRefund() external {
-        bondToken.safeTransferFrom(
-            address(this),
+        bondToken.safeTransfer(
             msg.sender,
             _bondToBeReturnedToAddress[msg.sender]
         );
     }
 
-    function reapSafForTokenIds(uint256[] calldata tokenIds) external {
-        uint256 netFees = 0;
-        uint256 feesToReap;
-        uint256 bondRemaining;
-        uint256 liquidationStartedAt;
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            require(
-                _exists(tokenIds[i]),
-                "token to reap fees for doesnt exist"
-            );
-            BondInfo storage currBondInfo = _bondInfosAtLastCheckpoint[
-                tokenIds[i]
-            ];
-            (
-                bondRemaining,
-                feesToReap,
-                liquidationStartedAt
-            ) = _getCurrentBondInfoForToken(currBondInfo);
-            currBondInfo.bondRemaining = bondRemaining;
-            currBondInfo.lastModifiedAt = block.timestamp;
-            currBondInfo.liquidationStartedAt = liquidationStartedAt;
-            netFees += feesToReap;
-        }
-        creatorFees += netFees;
-        withdrawAccumulatedFunds();
+    function reapAndWithdrawFees(uint256[] calldata tokenIds) external {
+        reapSafForTokenIds(tokenIds);
+        withdrawAccumulatedFees();
     }
 
     function viewBondRefund(address addr) external view returns (uint256) {
@@ -283,9 +260,35 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
 
     // Public functions ------------------------------------------------------
 
-    function withdrawAccumulatedFunds() public {
+    function reapSafForTokenIds(uint256[] calldata tokenIds) public {
+        uint256 netFees = 0;
+        uint256 feesToReap;
+        uint256 bondRemaining;
+        uint256 liquidationStartedAt;
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            require(
+                _exists(tokenIds[i]),
+                "token to reap fees for doesnt exist"
+            );
+            BondInfo storage currBondInfo = _bondInfosAtLastCheckpoint[
+                tokenIds[i]
+            ];
+            (
+                bondRemaining,
+                feesToReap,
+                liquidationStartedAt
+            ) = _getCurrentBondInfoForToken(currBondInfo);
+            currBondInfo.bondRemaining = bondRemaining;
+            currBondInfo.lastModifiedAt = block.timestamp;
+            currBondInfo.liquidationStartedAt = liquidationStartedAt;
+            netFees += feesToReap;
+        }
+        creatorFees += netFees;
+    }
+
+    function withdrawAccumulatedFees() public {
+        bondToken.safeTransfer(withdrawAddress, creatorFees);
         creatorFees = 0;
-        bondToken.safeTransferFrom(address(this), withdrawAddress, creatorFees);
     }
 
     function balanceOf(address owner)
@@ -494,7 +497,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         _owners[tokenId] = to;
         BondInfo storage bondInfoRef = _bondInfosAtLastCheckpoint[tokenId];
         _persistNewBondInfo(bondInfoRef, initialStatedPrice, bondAmount);
-        require(bondToken.transferFrom(to, address(this), bondAmount));
+        bondToken.safeTransferFrom(to, address(this), bondAmount);
         emit Transfer(address(0), to, tokenId);
         emit NewPriceSet(to, tokenId, initialStatedPrice);
     }

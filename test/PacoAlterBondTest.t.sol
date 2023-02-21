@@ -10,8 +10,8 @@ import "./utils/TestPacoToken.sol";
 
 contract PacoAlterBondTest is TestPacoToken {
     uint256 mintedTokenId;
-    uint256 onchainBond;
-    uint256 onchainPrice;
+    uint256 startOnchainBond;
+    uint256 startOnchainPrice;
 
     function setUp() public override {
         super.setUp();
@@ -22,22 +22,22 @@ contract PacoAlterBondTest is TestPacoToken {
         paco.mint(1, statedPrice, bond);
         uint256[] memory ownedTokens = paco.getTokenIdsForAddress(tokenWhale);
         mintedTokenId = ownedTokens[0];
-        onchainBond = paco.getBond(mintedTokenId);
-        onchainPrice = paco.getPrice(mintedTokenId);
+        startOnchainBond = paco.getBond(mintedTokenId);
+        startOnchainPrice = paco.getPrice(mintedTokenId);
     }
 
     function testBondCanBeIncreased() public {
         vm.prank(tokenWhale);
         paco.increaseBond(mintedTokenId, oneETH * 2);
         uint256 newBond = paco.getBond(mintedTokenId);
-        assertEq(newBond, onchainBond + oneETH * 2);
+        assertEq(newBond, startOnchainBond + oneETH * 2);
     }
 
     function testBondCanBeDecreased() public {
         vm.prank(tokenWhale);
         paco.decreaseBond(mintedTokenId, oneETH);
         uint256 newBond = paco.getBond(mintedTokenId);
-        assertEq(newBond, onchainBond - oneETH);
+        assertEq(newBond, startOnchainBond - oneETH);
     }
 
     function testFailBondCanNotBeDecreasedBelowZero() public {
@@ -49,14 +49,14 @@ contract PacoAlterBondTest is TestPacoToken {
         vm.prank(tokenWhale);
         paco.increaseStatedPrice(mintedTokenId, oneETH * 2);
         uint256 newPrice = paco.getPrice(mintedTokenId);
-        assertEq(newPrice, onchainPrice + oneETH * 2);
+        assertEq(newPrice, startOnchainPrice + oneETH * 2);
     }
 
     function testPriceCanBeDecreased() public {
         vm.prank(tokenWhale);
         paco.decreaseStatedPrice(mintedTokenId, oneETH);
         uint256 newPrice = paco.getPrice(mintedTokenId);
-        assertEq(newPrice, onchainPrice - oneETH);
+        assertEq(newPrice, startOnchainPrice - oneETH);
     }
 
     function testFailPriceCanNotBeIncreasedBeyondBond() public {
@@ -73,9 +73,18 @@ contract PacoAlterBondTest is TestPacoToken {
         );
         uint256 newBond = paco.getBond(mintedTokenId);
         uint256 newPrice = paco.getPrice(mintedTokenId);
-        assertEq(newPrice, onchainPrice + oneETH);
-        assertEq(newBond, onchainBond + oneETH * 2);
+        assertEq(newPrice, startOnchainPrice + oneETH);
+        assertEq(newBond, startOnchainBond + oneETH * 2);
     }
 
-    // TODO add remaining cases later
+    function testFailAlterRevertsWithBondTooLittle() public {
+        vm.prank(tokenWhale);
+        paco.alterStatedPriceAndBond(
+            mintedTokenId,
+            int256(oneETH),
+            -int256(oneETH * 5)
+        );
+    }
+
+    // TODO add remaining price and bond cases
 }
