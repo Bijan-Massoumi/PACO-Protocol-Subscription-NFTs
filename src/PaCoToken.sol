@@ -110,16 +110,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         );
     }
 
-    function isBeingLiquidated(uint256 tokenId)
-        external
-        view
-        override
-        returns (bool)
-    {
-        uint256 liquidationStartedAt = getLiquidationStartedAt(tokenId);
-        return liquidationStartedAt != 0;
-    }
-
     function alterStatedPriceAndBond(
         uint256 tokenId,
         int256 priceDelta,
@@ -259,6 +249,16 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     }
 
     // Public functions ------------------------------------------------------
+
+    function isBeingLiquidated(uint256 tokenId)
+        public
+        view
+        override
+        returns (bool)
+    {
+        uint256 liquidationStartedAt = getLiquidationStartedAt(tokenId);
+        return liquidationStartedAt != 0;
+    }
 
     function reapSafForTokenIds(uint256[] calldata tokenIds) public {
         uint256 netFees = 0;
@@ -501,11 +501,11 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     }
 
     function _alterStatedPriceAndBond(
-        uint256 _tokenId,
+        uint256 tokenId,
         int256 bondDelta,
         int256 priceDelta
     ) internal {
-        BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[_tokenId];
+        BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[tokenId];
         uint256 feesToReap = _modifyBondInfo(
             lastBondInfo,
             bondDelta,
@@ -514,8 +514,8 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         creatorFees += feesToReap;
 
         emit NewPriceBondSet(
-            ownerOf(_tokenId),
-            _tokenId,
+            ownerOf(tokenId),
+            tokenId,
             lastBondInfo.statedPrice,
             lastBondInfo.bondRemaining
         );
@@ -523,13 +523,13 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         // if bond is increasing, transfer bond from owner to contract
         if (bondDelta > 0) {
             bondToken.safeTransferFrom(
-                ownerOf(_tokenId),
+                ownerOf(tokenId),
                 address(this),
                 uint256(bondDelta)
             );
             // if bond is decreasing, transfer bond refund to owner
         } else if (bondDelta < 0) {
-            bondToken.safeTransfer(ownerOf(_tokenId), uint256(-bondDelta));
+            bondToken.safeTransfer(ownerOf(tokenId), uint256(-bondDelta));
         }
     }
 

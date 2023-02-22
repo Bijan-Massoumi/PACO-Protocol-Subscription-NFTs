@@ -85,7 +85,19 @@ contract PacoFeeTest is TestPacoToken {
     }
 
     function testFeeIsComputedCorrectlyInLiquidation() public {
-        vm.warp(startBlockTimestamp + 365 days * 5);
-        console.log(365 days, 31536000);
+        uint256 fiveYears = startBlockTimestamp + 365 days * 5;
+        vm.warp(fiveYears);
+        uint256 remainingBond = paco.getBond(mintedTokenId);
+        assertEq(remainingBond, 0);
+        bool isLiquidating = paco.isBeingLiquidated(mintedTokenId);
+        assertEq(isLiquidating, false);
+
+        uint256 prevPrice = paco.getPrice(mintedTokenId);
+        vm.warp(fiveYears + 2 days);
+        uint256 price = paco.getPrice(mintedTokenId);
+        assertEq(price, prevPrice / 2);
+        vm.warp(fiveYears + 4 days);
+        price = paco.getPrice(mintedTokenId);
+        assertEq(price, prevPrice / 4);
     }
 }

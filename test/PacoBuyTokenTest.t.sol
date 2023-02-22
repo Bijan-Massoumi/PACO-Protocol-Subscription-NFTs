@@ -69,4 +69,17 @@ contract PacoBuyTokenTest is TestPacoToken {
         vm.prank(emptyAddress);
         paco.buyToken(whaleTokenId, price + 1, oneETH / 2);
     }
+
+    function testBuyLiquidatingToken() public {
+        uint256 fiveYears = startBlockTimestamp + (365 days * 5) + 2 days;
+        vm.warp(fiveYears);
+        uint256 price = paco.getPrice(whaleTokenId);
+        assertEq(price, oneETH * 50);
+
+        uint256 balanceBefore = bondToken.balanceOf(tokenWhale);
+        vm.prank(owner);
+        paco.buyToken(whaleTokenId, oneETH * 50, oneETH * 10);
+        assertEq(paco.ownerOf(whaleTokenId), owner);
+        assertEq(bondToken.balanceOf(tokenWhale), balanceBefore + oneETH * 50);
+    }
 }

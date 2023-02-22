@@ -13,6 +13,8 @@ contract PacoAlterBondTest is TestPacoToken {
     uint256 startOnchainBond;
     uint256 startOnchainPrice;
 
+    error InsufficientBond();
+
     function setUp() public override {
         super.setUp();
         uint256 statedPrice = oneETH * 100;
@@ -92,5 +94,27 @@ contract PacoAlterBondTest is TestPacoToken {
         );
     }
 
-    // TODO add remaining price and bond cases
+    function testAlterTokenInLiquidation() public {
+        vm.prank(tokenWhale);
+        paco.mint(1, oneETH * 100, oneETH * 100);
+        uint256[] memory ownedTokens = paco.getTokenIdsForAddress(tokenWhale);
+        uint256 tokenId = ownedTokens[1];
+        uint256 fiveYears = startBlockTimestamp + (365 days * 5) + 2 days;
+        vm.warp(fiveYears);
+        uint256 price = paco.getPrice(tokenId);
+        assertEq(price, oneETH * 50);
+
+        vm.expectRevert(InsufficientBond.selector);
+        vm.prank(tokenWhale);
+        paco.increaseStatedPrice(tokenId, oneETH * 200);
+
+        vm.expectRevert(InsufficientBond.selector);
+        vm.prank(tokenWhale);
+        paco.increaseBond(tokenId, oneETH * 9);
+
+        vm.prank(tokenWhale);
+        paco.increaseBond(tokenId, oneETH * 10);
+        price = paco.getPrice(tokenId);
+        assertEq(price, oneETH * 100);
+    }
 }
