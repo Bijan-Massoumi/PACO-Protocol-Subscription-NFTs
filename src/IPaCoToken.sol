@@ -5,7 +5,12 @@ pragma solidity 0.8.18;
 //inspired by ERC721 and ERC721Enumerable
 interface IPaCoToken {
     event Transfer(address from, address to, uint256 _tokenId);
-    event NewPriceSet(address owner, uint256 tokenId, uint256 price);
+    event NewPriceBondSet(
+        address owner,
+        uint256 tokenId,
+        uint256 price,
+        uint256 bond
+    );
 
     /// @dev This emits when the approved address for an NFT is changed or
     ///  reaffirmed. The zero address indicates there is no approved address.

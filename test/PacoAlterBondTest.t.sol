@@ -27,17 +27,23 @@ contract PacoAlterBondTest is TestPacoToken {
     }
 
     function testBondCanBeIncreased() public {
+        uint256 prevBalance = bondToken.balanceOf(tokenWhale);
         vm.prank(tokenWhale);
         paco.increaseBond(mintedTokenId, oneETH * 2);
         uint256 newBond = paco.getBond(mintedTokenId);
+        uint256 newBalance = bondToken.balanceOf(tokenWhale);
         assertEq(newBond, startOnchainBond + oneETH * 2);
+        assertEq(newBalance, prevBalance - oneETH * 2);
     }
 
     function testBondCanBeDecreased() public {
+        uint256 beforeBalance = bondToken.balanceOf(tokenWhale);
         vm.prank(tokenWhale);
         paco.decreaseBond(mintedTokenId, oneETH);
         uint256 newBond = paco.getBond(mintedTokenId);
+        uint256 afterBalance = bondToken.balanceOf(tokenWhale);
         assertEq(newBond, startOnchainBond - oneETH);
+        assertEq(afterBalance, beforeBalance + oneETH);
     }
 
     function testFailBondCanNotBeDecreasedBelowZero() public {

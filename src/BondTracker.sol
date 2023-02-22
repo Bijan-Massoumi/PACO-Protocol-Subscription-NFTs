@@ -27,7 +27,14 @@ abstract contract BondTracker is Ownable {
     uint16 internal minimumBond = 1000;
     //set by constructor
     uint16 internal selfAssessmentRate;
-    uint256 halfLife = 172800;
+
+    /// ============ Errors ============
+    /// @notice Thrown if invalid price values
+    error InvalidAlterPriceValue();
+    /// @notice Thrown if invalid bond values
+    error InvalidAlterBondValue();
+    /// @notice Thrown if bond isnt enough to cover miminum bond
+    error InsufficientBond();
 
     constructor(uint16 _selfAssessmentRate) {
         selfAssessmentRate = _selfAssessmentRate;
@@ -53,10 +60,6 @@ abstract contract BondTracker is Ownable {
         selfAssessmentRate = newSelfAssessmentRate;
     }
 
-    function setHalfLife(uint16 newHalfLife) external onlyOwner {
-        halfLife = newHalfLife;
-    }
-
     function setMinimumBond(uint16 newMinimumBond) external onlyOwner {
         minimumBond = newMinimumBond;
     }
@@ -77,12 +80,12 @@ abstract contract BondTracker is Ownable {
         ) {
             return (0, 0, lastBondInfo.liquidationStartedAt);
         }
+
         uint256 totalFee = SafUtils._calculateSafSinceLastCheckIn(
             lastBondInfo.statedPrice,
             lastBondInfo.lastModifiedAt,
             selfAssessmentRate
         );
-
         if (totalFee > lastBondInfo.bondRemaining) {
             return (
                 0,
@@ -103,11 +106,11 @@ abstract contract BondTracker is Ownable {
         }
     }
 
-    function _refreshAndModifyExistingBondInfo(
+    function _modifyBondInfo(
         BondInfo storage _bondInfoAtLastCheckpoint,
-        int256 _bondDelta,
-        int256 _statedPriceDelta
-    ) internal returns (uint256 feesToReap, uint256 amountToTransfer) {
+        int256 bondDelta,
+        int256 statedPriceDelta
+    ) internal returns (uint256 feesToReap) {
         uint256 bondRemaining;
         uint256 liquidationStartedAt;
         (
@@ -116,22 +119,18 @@ abstract contract BondTracker is Ownable {
             liquidationStartedAt
         ) = _getCurrentBondInfoForToken(_bondInfoAtLastCheckpoint);
 
-        int256 newBond = int256(bondRemaining) + _bondDelta;
+        int256 newBond = int256(bondRemaining) + bondDelta;
         int256 newStatedPrice = int256(_bondInfoAtLastCheckpoint.statedPrice) +
-            _statedPriceDelta;
+            statedPriceDelta;
 
-        require(
-            newBond >= 0 && newStatedPrice >= 0,
-            "bad values passed for delta values"
-        );
+        if (newStatedPrice < 0) revert InvalidAlterPriceValue();
+        if (newBond < 0) revert InvalidAlterBondValue();
 
         _persistNewBondInfo(
             _bondInfoAtLastCheckpoint,
             uint256(newStatedPrice),
             uint256(newBond)
         );
-
-        amountToTransfer = _bondDelta > 0 ? uint256(_bondDelta) : 0;
     }
 
     function _persistNewBondInfo(
@@ -139,10 +138,9 @@ abstract contract BondTracker is Ownable {
         uint256 newStatedPrice,
         uint256 newBondAmount
     ) internal {
-        require(
-            newBondAmount >= (newStatedPrice * minimumBond) / 10000,
-            "Insufficient bond"
-        );
+        if (newBondAmount < (newStatedPrice * minimumBond) / 10000)
+            revert InsufficientBond();
+
         bondInfoRef.statedPrice = newStatedPrice;
         bondInfoRef.bondRemaining = newBondAmount;
         bondInfoRef.lastModifiedAt = block.timestamp;

@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/Test.sol";
 import "../src/SafUtils.sol";
 import "./utils/TestPacoToken.sol";
@@ -10,10 +9,7 @@ import "./utils/TestPacoToken.sol";
 contract PacoFeeTest is TestPacoToken {
     uint256 mintedTokenId;
     uint256 ownerTokenId;
-    uint256 startOnchainBond;
     uint256 startOnchainPrice;
-    uint256 secondsInYear = 31536000;
-    uint256 secondsInDay = 86400;
 
     function setUp() public override {
         super.setUp();
@@ -24,7 +20,6 @@ contract PacoFeeTest is TestPacoToken {
         paco.mint(1, statedPrice, bond);
         uint256[] memory whaleTokens = paco.getTokenIdsForAddress(tokenWhale);
         mintedTokenId = whaleTokens[0];
-        startOnchainBond = paco.getBond(mintedTokenId);
         startOnchainPrice = paco.getPrice(mintedTokenId);
 
         vm.prank(owner);
@@ -34,7 +29,7 @@ contract PacoFeeTest is TestPacoToken {
     }
 
     function testFeeCalculationAfterMint() public {
-        vm.warp(startBlockTimestamp + secondsInYear);
+        vm.warp(startBlockTimestamp + 365 days);
         uint256 feeCollected = SafUtils._calculateSafSinceLastCheckIn(
             startOnchainPrice,
             startBlockTimestamp,
@@ -44,48 +39,53 @@ contract PacoFeeTest is TestPacoToken {
     }
 
     function testBondCalculatedCorrectlyAfterPriceIncrease() public {
-        vm.warp(startBlockTimestamp + secondsInYear);
+        vm.warp(startBlockTimestamp + 365 days);
         uint256 remainingBond = paco.getBond(mintedTokenId);
         assertEq(remainingBond, oneETH * 80);
 
         vm.prank(tokenWhale);
         paco.increaseStatedPrice(mintedTokenId, oneETH * 100);
-        vm.warp(startBlockTimestamp + secondsInYear * 2);
+        vm.warp(startBlockTimestamp + 365 days * 2);
         remainingBond = paco.getBond(mintedTokenId);
         assertEq(remainingBond, oneETH * 40);
     }
 
     function testBondRemainingNeverNegative() public {
-        vm.warp(startBlockTimestamp + secondsInYear * 10);
+        vm.warp(startBlockTimestamp + 365 days * 10);
         uint256 remainingBond = paco.getBond(mintedTokenId);
         assertEq(remainingBond, 0);
     }
 
     function testReapSafForCreator() public {
-        vm.warp(startBlockTimestamp + secondsInYear);
+        vm.warp(startBlockTimestamp + 365 days);
         uint256[] memory tokens = new uint256[](2);
         tokens[0] = mintedTokenId;
         tokens[1] = ownerTokenId;
 
         uint256 expectedAnnualFees = oneETH * 20 + oneETH * 2;
         paco.reapAndWithdrawFees(tokens);
-        uint256 balance = tokenContract.balanceOf(withdrawAddr);
+        uint256 balance = bondToken.balanceOf(withdrawAddr);
         assertEq(balance, expectedAnnualFees);
 
-        vm.warp(startBlockTimestamp + secondsInYear * 2);
+        vm.warp(startBlockTimestamp + 365 days * 2);
         paco.reapAndWithdrawFees(tokens);
-        balance = tokenContract.balanceOf(withdrawAddr);
+        balance = bondToken.balanceOf(withdrawAddr);
         assertEq(balance, expectedAnnualFees * 2);
     }
 
     function testWithdrawFeesAfterOwnerAlters() public {
-        vm.warp(startBlockTimestamp + secondsInYear);
+        vm.warp(startBlockTimestamp + 365 days);
         vm.prank(tokenWhale);
         paco.alterStatedPriceAndBond(mintedTokenId, 1, 1);
         vm.prank(owner);
         paco.alterStatedPriceAndBond(ownerTokenId, 1, 1);
         paco.withdrawAccumulatedFees();
-        uint256 balance = tokenContract.balanceOf(withdrawAddr);
+        uint256 balance = bondToken.balanceOf(withdrawAddr);
         assertEq(balance, oneETH * 20 + oneETH * 2);
+    }
+
+    function testFeeIsComputedCorrectlyInLiquidation() public {
+        vm.warp(startBlockTimestamp + 365 days * 5);
+        console.log(365 days, 31536000);
     }
 }

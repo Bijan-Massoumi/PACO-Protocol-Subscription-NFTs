@@ -9,7 +9,7 @@ import "./TestERC20.sol";
 
 abstract contract TestPacoToken is Test {
     PaCoExample paco;
-    TestToken tokenContract;
+    TestToken bondToken;
     uint256 oneETH = 10**18;
 
     address withdrawAddr = address(1137);
@@ -18,28 +18,34 @@ abstract contract TestPacoToken is Test {
     address addr2 = address(2);
     address addr3 = address(3);
     uint256 startBlockTimestamp = 1642941822;
+    // 20% annual rate
     uint16 feeRate = 2000;
 
     function setUp() public virtual {
         vm.warp(startBlockTimestamp);
-        tokenContract = new TestToken("TestToken", "TT");
+        bondToken = new TestToken("TestToken", "TT");
         vm.prank(tokenWhale);
-        tokenContract.mint(oneETH * 1000000000);
+        bondToken.mint(oneETH * 1000000000);
         vm.startPrank(owner);
-        paco = new PaCoExample(address(tokenContract), withdrawAddr, feeRate);
+        paco = new PaCoExample(address(bondToken), withdrawAddr, feeRate);
         paco.setSaleStatus(true);
         vm.stopPrank();
 
         vm.prank(tokenWhale);
-        tokenContract.approve(address(paco), oneETH * 10000);
+        bondToken.approve(address(paco), oneETH * 10000);
         vm.prank(owner);
-        tokenContract.approve(address(paco), oneETH * 10000);
+        bondToken.approve(address(paco), oneETH * 10000);
         vm.prank(addr2);
-        tokenContract.approve(address(paco), oneETH * 10000);
+        bondToken.approve(address(paco), oneETH * 10000);
 
         vm.startPrank(tokenWhale);
-        tokenContract.transfer(owner, oneETH * 500);
-        tokenContract.transfer(addr2, oneETH * 500);
+        bondToken.transfer(owner, oneETH * 500);
+        bondToken.transfer(addr2, oneETH * 500);
         vm.stopPrank();
+    }
+
+    function approveNewAddress(address addr) public {
+        vm.prank(addr);
+        bondToken.approve(address(paco), oneETH * 10000);
     }
 }
