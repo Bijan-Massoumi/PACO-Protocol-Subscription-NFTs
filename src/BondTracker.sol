@@ -2,6 +2,7 @@
 pragma solidity 0.8.18;
 
 import "./SafUtils.sol";
+import "forge-std/Test.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 struct BondInfo {
@@ -17,16 +18,21 @@ struct EscrowIntentToReceive {
     uint256 expiry;
 }
 
+struct FeeChangeTimestamp {
+    uint256 timestamp;
+    uint256 previousRate;
+}
+
 abstract contract BondTracker is Ownable {
     mapping(uint256 => BondInfo) internal _bondInfosAtLastCheckpoint;
-    mapping(address => uint256) internal _bondToBeReturnedToAddress;
+    FeeChangeTimestamp[] feeChangeTimestamps;
     mapping(address => mapping(uint256 => EscrowIntentToReceive)) escrowIntentToReceive;
 
     // min percentage (10%) of total stated price that
     // must be convered by bond
-    uint16 internal minimumBond = 1000;
+    uint256 internal minimumBond = 1000;
     //set by constructor
-    uint16 internal selfAssessmentRate;
+    uint256 internal selfAssessmentRate;
 
     /// ============ Errors ============
     /// @notice Thrown if invalid price values
@@ -36,7 +42,7 @@ abstract contract BondTracker is Ownable {
     /// @notice Thrown if bond isnt enough to cover miminum bond
     error InsufficientBond();
 
-    constructor(uint16 _selfAssessmentRate) {
+    constructor(uint256 _selfAssessmentRate) {
         selfAssessmentRate = _selfAssessmentRate;
     }
 
@@ -57,6 +63,12 @@ abstract contract BondTracker is Ownable {
         external
         onlyOwner
     {
+        feeChangeTimestamps.push(
+            FeeChangeTimestamp({
+                timestamp: block.timestamp,
+                previousRate: selfAssessmentRate
+            })
+        );
         selfAssessmentRate = newSelfAssessmentRate;
     }
 
@@ -68,9 +80,9 @@ abstract contract BondTracker is Ownable {
         internal
         view
         returns (
-            uint256 bondRemaining,
-            uint256 feesToReap,
-            uint256 liquidationStartedAt
+            uint256,
+            uint256,
+            uint256
         )
     {
         // either they have no tokens or they are being liquidated
@@ -81,29 +93,77 @@ abstract contract BondTracker is Ownable {
             return (0, 0, lastBondInfo.liquidationStartedAt);
         }
 
-        uint256 totalFee = SafUtils._calculateSafSinceLastCheckIn(
+        uint256 feesToReap;
+        uint256 liquidationStartedAt;
+        (feesToReap, liquidationStartedAt) = _calculateFeesAndLiquidationTime(
             lastBondInfo.statedPrice,
             lastBondInfo.lastModifiedAt,
-            selfAssessmentRate
+            lastBondInfo.bondRemaining
         );
-        if (totalFee > lastBondInfo.bondRemaining) {
+
+        if (feesToReap > lastBondInfo.bondRemaining) {
             return (
                 0,
-                totalFee - lastBondInfo.bondRemaining,
-                SafUtils._getTimeLiquidationBegan(
-                    lastBondInfo.statedPrice,
-                    lastBondInfo.lastModifiedAt,
-                    selfAssessmentRate,
-                    lastBondInfo.bondRemaining
-                )
-            );
-        } else {
-            return (
-                lastBondInfo.bondRemaining - totalFee,
-                totalFee,
-                lastBondInfo.liquidationStartedAt
+                feesToReap - lastBondInfo.bondRemaining,
+                liquidationStartedAt
             );
         }
+        return (
+            lastBondInfo.bondRemaining - feesToReap,
+            feesToReap,
+            lastBondInfo.liquidationStartedAt
+        );
+    }
+
+    function _calculateFeesAndLiquidationTime(
+        uint256 statedPrice,
+        uint256 lastModifiedAt,
+        uint256 bondRemaining
+    ) internal view returns (uint256, uint256) {
+        // sum fees for each duration a specific fee rate was active
+        uint256 totalFee;
+        uint256 prevIntervalFee;
+        uint256 liquidationTime;
+        uint256 startTime = lastModifiedAt;
+        for (uint256 i = 0; i < feeChangeTimestamps.length; i++) {
+            uint256 feeChangeTimestamp = feeChangeTimestamps[i].timestamp;
+            uint256 previousRate = feeChangeTimestamps[i].previousRate;
+            if (feeChangeTimestamp > startTime) {
+                uint256 intervalFee = SafUtils._calculateSafBetweenTimes(
+                    statedPrice,
+                    startTime,
+                    feeChangeTimestamp,
+                    previousRate
+                );
+                totalFee += intervalFee;
+                if (totalFee > bondRemaining) {
+                    liquidationTime = SafUtils._getTimeLiquidationBegan(
+                        statedPrice,
+                        startTime,
+                        previousRate,
+                        bondRemaining - prevIntervalFee
+                    );
+                    return (totalFee, liquidationTime);
+                }
+                startTime = feeChangeTimestamp;
+                prevIntervalFee += intervalFee;
+            }
+        }
+        totalFee += SafUtils._calculateSafBetweenTimes(
+            statedPrice,
+            startTime,
+            block.timestamp,
+            selfAssessmentRate
+        );
+        if (totalFee > bondRemaining) {
+            liquidationTime = SafUtils._getTimeLiquidationBegan(
+                statedPrice,
+                startTime,
+                selfAssessmentRate,
+                bondRemaining - prevIntervalFee
+            );
+        }
+        return (totalFee, liquidationTime);
     }
 
     function _modifyBondInfo(

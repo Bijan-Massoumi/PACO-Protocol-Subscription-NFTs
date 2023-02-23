@@ -160,15 +160,11 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         withdrawAccumulatedFees();
     }
 
-    function getBond(uint256 _tokenId)
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function getBond(uint256 tokenId) external view override returns (uint256) {
+        if (!_exists(tokenId)) revert TokenDoesntExist();
         uint256 bondRemaining;
         (bondRemaining, , ) = _getCurrentBondInfoForToken(
-            _bondInfosAtLastCheckpoint[_tokenId]
+            _bondInfosAtLastCheckpoint[tokenId]
         );
 
         return bondRemaining;
@@ -197,14 +193,16 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         return tokenIds;
     }
 
-    function getPrice(uint256 _tokenId)
+    function getPrice(uint256 tokenId)
         external
         view
         override
         returns (uint256)
     {
+        if (!_exists(tokenId)) revert TokenDoesntExist();
+
         uint256 liquidationStartedAt;
-        BondInfo memory bondInfo = _bondInfosAtLastCheckpoint[_tokenId];
+        BondInfo memory bondInfo = _bondInfosAtLastCheckpoint[tokenId];
         (, , liquidationStartedAt) = _getCurrentBondInfoForToken(bondInfo);
         if (liquidationStartedAt != 0) {
             return

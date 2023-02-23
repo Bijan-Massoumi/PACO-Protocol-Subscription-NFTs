@@ -30,9 +30,10 @@ contract PacoFeeTest is TestPacoToken {
 
     function testFeeCalculationAfterMint() public {
         vm.warp(startBlockTimestamp + 365 days);
-        uint256 feeCollected = SafUtils._calculateSafSinceLastCheckIn(
+        uint256 feeCollected = SafUtils._calculateSafBetweenTimes(
             startOnchainPrice,
             startBlockTimestamp,
+            block.timestamp,
             feeRate
         );
         assertEq(feeCollected, oneETH * 20);
@@ -99,5 +100,17 @@ contract PacoFeeTest is TestPacoToken {
         vm.warp(fiveYears + 4 days);
         price = paco.getPrice(mintedTokenId);
         assertEq(price, prevPrice / 4);
+    }
+
+    function testFeeComputedCorrectlyAfterFeeChanges() public {
+        vm.startPrank(owner);
+        vm.warp(startBlockTimestamp + 365 days);
+        paco.setSelfAssessmentRate(1000);
+        vm.warp(startBlockTimestamp + 365 days * 2);
+        paco.setSelfAssessmentRate(500);
+        vm.warp(startBlockTimestamp + 365 days * 3);
+        vm.stopPrank();
+        uint256 bond = paco.getBond(mintedTokenId);
+        assertEq(bond, oneETH * 65);
     }
 }

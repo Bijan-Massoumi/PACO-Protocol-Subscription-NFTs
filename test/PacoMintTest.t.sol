@@ -20,9 +20,10 @@ contract PacoMintTest is TestPacoToken {
         uint256 mintedTokenId = ownedTokens[0];
         vm.warp(startBlockTimestamp + 5000);
         uint256 startOnchainBond = paco.getBond(mintedTokenId);
-        uint256 feeCollected = SafUtils._calculateSafSinceLastCheckIn(
+        uint256 feeCollected = SafUtils._calculateSafBetweenTimes(
             statedPrice,
             startBlockTimestamp,
+            block.timestamp,
             feeRate
         );
         assertEq(startOnchainBond, bond - feeCollected);
