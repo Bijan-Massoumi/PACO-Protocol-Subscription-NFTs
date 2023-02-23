@@ -113,4 +113,20 @@ contract PacoFeeTest is TestPacoToken {
         uint256 bond = paco.getBond(mintedTokenId);
         assertEq(bond, oneETH * 65);
     }
+
+    function testLiquidationTimeCalculationAfterFeeChange() public {
+        vm.startPrank(owner);
+        vm.warp(startBlockTimestamp + 365 days * 3);
+        paco.setSelfAssessmentRate(1000);
+        vm.warp(startBlockTimestamp + 365 days * 7);
+        vm.stopPrank();
+        uint256 bond = paco.getBond(mintedTokenId);
+        bool isLiquidating = paco.isBeingLiquidated(mintedTokenId);
+        assertEq(bond, 0);
+        assertEq(isLiquidating, false);
+
+        vm.warp(startBlockTimestamp + (365 days * 7) + 2 days);
+        uint256 price = paco.getPrice(mintedTokenId);
+        assertEq(price, oneETH * 50);
+    }
 }
