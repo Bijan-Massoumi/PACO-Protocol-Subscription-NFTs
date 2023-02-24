@@ -115,16 +115,25 @@ abstract contract BondTracker is Ownable {
         );
     }
 
+    /*
+     * @notice Calculates the fees that have accrued since the last checkpoint
+     * and the time at which the bond ran out (i.e. liquidation began)
+     * @param statedPrice The price at which the bond was last modified
+     * @param lastModifiedAt The time at which the bond/statedPrice was last modified
+     * @param bondRemaining The amount of bond remaining
+     * @return totalFee The total fees that have accrued since the last checkpoint
+     * @return liquidationTime The time at which the bond hit 0
+     */
     function _calculateFeesAndLiquidationTime(
         uint256 statedPrice,
         uint256 lastModifiedAt,
         uint256 bondRemaining
     ) internal view returns (uint256, uint256) {
-        // sum fees for each duration a specific fee rate was active
         uint256 totalFee;
         uint256 prevIntervalFee;
         uint256 liquidationTime;
         uint256 startTime = lastModifiedAt;
+        // iterate through all fee changes that have happened since the last checkpoint
         for (uint256 i = 0; i < feeChangeTimestamps.length; i++) {
             uint256 feeChangeTimestamp = feeChangeTimestamps[i].timestamp;
             uint256 previousRate = feeChangeTimestamps[i].previousRate;
@@ -136,6 +145,7 @@ abstract contract BondTracker is Ownable {
                     previousRate
                 );
                 totalFee += intervalFee;
+                // if the total fee is greater than the bond remaining, we know that the bond ran out
                 if (totalFee > bondRemaining) {
                     liquidationTime = SafUtils._getTimeLiquidationBegan(
                         statedPrice,
@@ -149,6 +159,8 @@ abstract contract BondTracker is Ownable {
                 prevIntervalFee += intervalFee;
             }
         }
+
+        // calculate the fee for the current interval (i.e. since the last fee change)
         totalFee += SafUtils._calculateSafBetweenTimes(
             statedPrice,
             startTime,
@@ -163,6 +175,7 @@ abstract contract BondTracker is Ownable {
                 bondRemaining - prevIntervalFee
             );
         }
+
         return (totalFee, liquidationTime);
     }
 

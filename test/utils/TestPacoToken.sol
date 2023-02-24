@@ -28,7 +28,6 @@ abstract contract TestPacoToken is Test {
         bondToken.mint(oneETH * 1000000000);
         vm.startPrank(owner);
         paco = new PaCoExample(address(bondToken), withdrawAddr, feeRate);
-        paco.setSaleStatus(true);
         vm.stopPrank();
 
         vm.prank(tokenWhale);

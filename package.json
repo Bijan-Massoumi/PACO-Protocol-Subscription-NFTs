@@ -1,0 +1,22 @@
+{
+  "name": "Paco-Foundry",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "forge build ; typechain --target=ethers-v5 --out-dir ./typechain ./out/PaCoExample.sol/PaCoExample.json",
+    "deployTestContract":"pnpm run build && forge create --rpc-url $RPC --private-key $DEPLOYMENT_PRIVATE_KEY src/PaCoExample.sol:PaCoExample"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ethers": "^5.0.0",
+    "tsx": "^3.12.3"
+  },
+  "devDependencies": {
+    "@typechain/ethers-v5": "^10.2.0",
+    "typechain": "^8.1.1"
+  }
+}
