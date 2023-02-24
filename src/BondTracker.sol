@@ -12,12 +12,6 @@ struct BondInfo {
     uint256 liquidationStartedAt;
 }
 
-struct EscrowIntentToReceive {
-    uint256 statedPrice;
-    uint256 bondToPost;
-    uint256 expiry;
-}
-
 struct FeeChangeTimestamp {
     uint256 timestamp;
     uint256 previousRate;
@@ -26,7 +20,6 @@ struct FeeChangeTimestamp {
 abstract contract BondTracker is Ownable {
     mapping(uint256 => BondInfo) internal _bondInfosAtLastCheckpoint;
     FeeChangeTimestamp[] feeChangeTimestamps;
-    mapping(address => mapping(uint256 => EscrowIntentToReceive)) escrowIntentToReceive;
 
     // min percentage (10%) of total stated price that
     // must be convered by bond
@@ -218,19 +211,5 @@ abstract contract BondTracker is Ownable {
         bondInfoRef.bondRemaining = newBondAmount;
         bondInfoRef.lastModifiedAt = block.timestamp;
         bondInfoRef.liquidationStartedAt = 0;
-    }
-
-    function _setEscrowIntent(
-        uint256 tokenId,
-        uint256 price,
-        uint256 bond,
-        uint256 expiry
-    ) internal {
-        require(expiry > block.timestamp);
-        escrowIntentToReceive[msg.sender][tokenId] = EscrowIntentToReceive(
-            price,
-            bond,
-            expiry
-        );
     }
 }

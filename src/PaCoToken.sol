@@ -9,8 +9,9 @@ import "./PaCoTokenEnumerable.sol";
 import "./BondTracker.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract PaCoToken is PaCoTokenEnumerable, BondTracker {
+abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -22,9 +23,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
 
     // Mapping from token ID to approved address
     mapping(uint256 => address) private _tokenApprovals;
-
-    // Mapping from owner to operator approvals
-    mapping(address => mapping(address => bool)) private _operatorApprovals;
 
     uint256 creatorFees;
     IERC20 bondToken;
@@ -65,49 +63,8 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         uint256 newPrice,
         uint256 bondAmount
     ) external virtual override {
-        address currentOwnerAddress = ownerOf(tokenId);
-        if (currentOwnerAddress == msg.sender) revert ClaimingOwnNFT();
-
-        uint256 feesToReap;
-        uint256 liquidationStartedAt;
-        uint256 bondRemaining;
-        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
-        (
-            bondRemaining,
-            feesToReap,
-            liquidationStartedAt
-        ) = _getCurrentBondInfoForToken(currentOwnersBond);
-
-        if (liquidationStartedAt != 0) {
-            uint256 buyPrice = SafUtils.getLiquidationPrice(
-                currentOwnersBond.statedPrice,
-                block.timestamp - liquidationStartedAt,
-                halfLife
-            );
-            bondToken.safeTransferFrom(
-                msg.sender,
-                currentOwnerAddress,
-                buyPrice
-            );
-        } else {
-            bondToken.safeTransferFrom(
-                msg.sender,
-                currentOwnerAddress,
-                currentOwnersBond.statedPrice
-            );
-        }
-
-        bondToken.safeTransfer(currentOwnerAddress, bondRemaining);
-        creatorFees += feesToReap;
-
-        _swapAndPostBond(
-            currentOwnerAddress,
-            msg.sender,
-            msg.sender,
-            tokenId,
-            newPrice,
-            bondAmount
-        );
+        if (ownerOf(tokenId) == _msgSender()) revert ClaimingOwnNFT();
+        _buyToken(tokenId, newPrice, bondAmount);
     }
 
     function alterStatedPriceAndBond(
@@ -225,35 +182,9 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         return _bondInfosAtLastCheckpoint[_tokenId].statedPrice;
     }
 
-    function setEscrowIntent(
-        uint256 tokenId,
-        uint256 price,
-        uint256 bond,
-        uint256 expiry
-    ) external override {
-        if (!_exists(tokenId)) revert TokenDoesntExist();
-        if (ownerOf(tokenId) == msg.sender)
-            revert SettingEschrowForOwnedToken();
-
-        _setEscrowIntent(tokenId, price, bond, expiry);
-    }
-
-    function getIntent(uint256 tokenId, address receiver)
-        external
-        view
-        returns (EscrowIntentToReceive memory)
-    {
-        return escrowIntentToReceive[receiver][tokenId];
-    }
-
     // Public functions ------------------------------------------------------
 
-    function isBeingLiquidated(uint256 tokenId)
-        public
-        view
-        override
-        returns (bool)
-    {
+    function isBeingLiquidated(uint256 tokenId) public view returns (bool) {
         uint256 liquidationStartedAt = getLiquidationStartedAt(tokenId);
         return liquidationStartedAt != 0;
     }
@@ -317,7 +248,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         if (to == owner) revert ApprovalToCurrentOwner();
 
         require(
-            msg.sender == owner || isApprovedForAll(owner, msg.sender),
+            msg.sender == owner,
             "ERC721: approve caller is not owner nor approved for all"
         );
 
@@ -339,36 +270,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         return _tokenApprovals[tokenId];
     }
 
-    /**
-     * @dev See {PaCo-setApprovalForAll}.
-     */
-    function setApprovalForAll(address operator, bool approved)
-        public
-        virtual
-        override
-    {
-        require(operator != msg.sender, "ERC721: approve to caller");
-
-        _operatorApprovals[msg.sender][operator] = approved;
-        emit ApprovalForAll(msg.sender, operator, approved);
-    }
-
-    /**
-     * @dev See {PaCo-isApprovedForAll}.
-     */
-    function isApprovedForAll(address owner, address operator)
-        public
-        view
-        virtual
-        override
-        returns (bool)
-    {
-        return _operatorApprovals[owner][operator];
-    }
-
-    /**
-     * @dev See {PaCo-tokenOfOwnerByIndex}.
-     */
     function tokenOfOwnerByIndex(address owner, uint256 index)
         public
         view
@@ -383,16 +284,10 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         return _ownedTokens[owner][index];
     }
 
-    /**
-     * @dev See {PaCo-totalSupply}.
-     */
     function totalSupply() public view virtual override returns (uint256) {
         return _allTokens.length;
     }
 
-    /**
-     * @dev See {PaCo-tokenByIndex}.
-     */
     function tokenByIndex(uint256 index)
         public
         view
@@ -415,9 +310,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         safeTransferFrom(from, to, tokenId, "");
     }
 
-    /**
-     * @dev See {IERC721-safeTransferFrom}.
-     */
     function safeTransferFrom(
         address from,
         address to,
@@ -446,23 +338,60 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
 
     // Internal functions ------------------------------------------------------
 
-    /**
-     * @dev Approve `to` to operate on `tokenId`
-     *
-     * Emits a {Approval} event.
-     */
+    function _buyToken(
+        uint256 tokenId,
+        uint256 newPrice,
+        uint256 bondAmount
+    ) internal virtual {
+        address currentOwnerAddress = ownerOf(tokenId);
+
+        uint256 feesToReap;
+        uint256 liquidationStartedAt;
+        uint256 bondRemaining;
+        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
+        (
+            bondRemaining,
+            feesToReap,
+            liquidationStartedAt
+        ) = _getCurrentBondInfoForToken(currentOwnersBond);
+
+        if (liquidationStartedAt != 0) {
+            uint256 buyPrice = SafUtils.getLiquidationPrice(
+                currentOwnersBond.statedPrice,
+                block.timestamp - liquidationStartedAt,
+                halfLife
+            );
+            bondToken.safeTransferFrom(
+                msg.sender,
+                currentOwnerAddress,
+                buyPrice
+            );
+        } else {
+            bondToken.safeTransferFrom(
+                msg.sender,
+                currentOwnerAddress,
+                currentOwnersBond.statedPrice
+            );
+        }
+
+        bondToken.safeTransfer(currentOwnerAddress, bondRemaining);
+        creatorFees += feesToReap;
+
+        _swapAndPostBond(
+            currentOwnerAddress,
+            msg.sender,
+            msg.sender,
+            tokenId,
+            newPrice,
+            bondAmount
+        );
+    }
+
     function _approve(address to, uint256 tokenId) internal virtual {
         _tokenApprovals[tokenId] = to;
         emit Approval(ownerOf(tokenId), to, tokenId);
     }
 
-    /**
-     * @dev Returns whether `spender` is allowed to manage `tokenId`.
-     *
-     * Requirements:
-     *
-     * - `tokenId` must exist.
-     */
     function _isApprovedOrOwner(address spender, uint256 tokenId)
         internal
         view
@@ -474,9 +403,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             "ERC721: operator query for nonexistent token"
         );
         address owner = ownerOf(tokenId);
-        return (spender == owner ||
-            getApproved(tokenId) == spender ||
-            isApprovedForAll(owner, spender));
+        return (spender == owner || getApproved(tokenId) == spender);
     }
 
     function _mint(
@@ -485,12 +412,13 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         uint256 initialStatedPrice,
         uint256 bondAmount
     ) internal virtual {
-        require(to != address(0), "PaCo: mint to the zero address");
         require(!_exists(tokenId), "Token already minted");
+        require(to != address(0), "PaCo: mint to the zero address");
 
         _beforeTokenTransfer(address(0), to, tokenId);
         _balances[to] += 1;
         _owners[tokenId] = to;
+
         BondInfo storage bondInfoRef = _bondInfosAtLastCheckpoint[tokenId];
         _persistNewBondInfo(bondInfoRef, initialStatedPrice, bondAmount);
         bondToken.safeTransferFrom(to, address(this), bondAmount);
@@ -502,7 +430,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         uint256 tokenId,
         int256 bondDelta,
         int256 priceDelta
-    ) internal {
+    ) internal virtual {
         BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[tokenId];
         uint256 feesToReap = _modifyBondInfo(
             lastBondInfo,
@@ -535,7 +463,7 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         return _owners[tokenId] != address(0);
     }
 
-    function _burnToken(uint256 _tokenId) internal {
+    function _burnToken(uint256 _tokenId) internal virtual {
         address owner = ownerOf(_tokenId);
         _beforeTokenTransfer(owner, address(0), _tokenId);
         // Clear approvals
@@ -544,23 +472,6 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         delete _owners[_tokenId];
         delete _bondInfosAtLastCheckpoint[_tokenId];
         emit Transfer(owner, address(0), _tokenId);
-    }
-
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) private {
-        if (from == address(0)) {
-            _addTokenToAllTokensEnumeration(tokenId);
-        } else if (from != to) {
-            _removeTokenFromOwnerEnumeration(from, tokenId, balanceOf(from));
-        }
-        if (to == address(0)) {
-            _removeTokenFromAllTokensEnumeration(tokenId);
-        } else if (to != from) {
-            _addTokenToOwnerEnumeration(to, tokenId, balanceOf(to));
-        }
     }
 
     function _safeTransfer(
@@ -580,41 +491,39 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         address from,
         address to,
         uint256 tokenId
-    ) internal {
+    ) internal virtual {
         address currentOwnerAddress = ownerOf(tokenId);
         require(
             currentOwnerAddress == from,
             "ERC721: transfer of token that is not own"
         );
-        require(to != address(0), "ERC721: transfer to the zero address");
-
-        EscrowIntentToReceive
-            memory recipientEscrowInfo = escrowIntentToReceive[to][tokenId];
+        require(to != address(0), "PaCo: transfer to the zero address");
+        _beforeTokenTransfer(from, to, tokenId);
+        // Check that tokenId was not transferred by `_beforeTokenTransfer` hook
         require(
-            recipientEscrowInfo.expiry > block.timestamp,
-            "Intent to receive expired."
+            ownerOf(tokenId) == from,
+            "PaCo: transfer from incorrect owner"
+        );
+        require(
+            _tokenIsAuthorizedForTransfer(tokenId),
+            "PaCo: token not authorized"
         );
 
-        uint256 bondRemaining;
-        uint256 feesToReap;
-        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
-        (bondRemaining, feesToReap, ) = _getCurrentBondInfoForToken(
-            currentOwnersBond
-        );
+        // Clear approvals from the previous owner
+        delete _tokenApprovals[tokenId];
+        unchecked {
+            // `_balances[from]` cannot overflow for the same reason as described in `_burn`:
+            // `from`'s balance is the number of token held, which is at least one before the current
+            // transfer.
+            // `_balances[to]` could overflow in the conditions described in `_mint`. That would require
+            // all 2**256 token ids to be minted, which in practice is impossible.
+            _balances[from] -= 1;
+            _balances[to] += 1;
+        }
+        _owners[tokenId] = to;
+        emit Transfer(from, to, tokenId);
 
-        bondToken.safeTransfer(currentOwnerAddress, bondRemaining);
-        creatorFees += feesToReap;
-
-        _swapAndPostBond(
-            currentOwnerAddress,
-            to,
-            to,
-            tokenId,
-            recipientEscrowInfo.statedPrice,
-            recipientEscrowInfo.bondToPost
-        );
-
-        delete escrowIntentToReceive[to][tokenId];
+        _afterTokenTransfer(from, to, tokenId);
     }
 
     function _swapAndPostBond(
@@ -624,22 +533,13 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         uint256 tokenId,
         uint256 newPrice,
         uint256 bondAmount
-    ) internal {
-        require(to != address(0), "ERC721: transfer to the zero address");
-
-        // Clear approvals from the previous owner
-        _approve(address(0), tokenId);
-
-        _beforeTokenTransfer(from, to, tokenId);
-        _balances[to] += 1;
-        _balances[from] -= 1;
-        _owners[tokenId] = to;
+    ) internal virtual {
+        _transfer(from, to, tokenId);
 
         BondInfo storage bondInfoRef = _bondInfosAtLastCheckpoint[tokenId];
         _persistNewBondInfo(bondInfoRef, newPrice, bondAmount);
         bondToken.safeTransferFrom(payer, address(this), bondAmount);
 
-        emit Transfer(from, to, tokenId);
         emit NewPriceBondSet(to, tokenId, newPrice, bondAmount);
     }
 
@@ -675,4 +575,46 @@ contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             return true;
         }
     }
+
+    /**
+     * @dev Hook that is called after any token transfer. This includes minting and burning. If {ERC721Consecutive} is
+     * used, the hook may be called as part of a consecutive (batch) mint, as indicated by `batchSize` greater than 1.
+     *
+     * Calling conditions:
+     *
+     * - When `from` and `to` are both non-zero, ``from``'s tokens were transferred to `to`.
+     * - When `from` is zero, the tokens were minted for `to`.
+     * - When `to` is zero, ``from``'s tokens were burned.
+     * - `from` and `to` are never both zero.
+     * - `batchSize` is non-zero.
+     *
+     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
+     */
+    function _afterTokenTransfer(
+        address from,
+        address to,
+        uint256 firstTokenId
+    ) internal virtual {}
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal virtual {
+        if (from == address(0)) {
+            _addTokenToAllTokensEnumeration(tokenId);
+        } else if (from != to) {
+            _removeTokenFromOwnerEnumeration(from, tokenId, balanceOf(from));
+        }
+        if (to == address(0)) {
+            _removeTokenFromAllTokensEnumeration(tokenId);
+        } else if (to != from) {
+            _addTokenToOwnerEnumeration(to, tokenId, balanceOf(to));
+        }
+    }
+
+    function _tokenIsAuthorizedForTransfer(uint256 tokenId)
+        internal
+        virtual
+        returns (bool);
 }

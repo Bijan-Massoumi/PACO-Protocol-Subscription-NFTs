@@ -4,8 +4,8 @@ pragma solidity 0.8.18;
 
 import "./PaCoToken.sol";
 
-contract PaCoExample is PaCoToken {
-    uint256 public constant mintPrice = 30000000000000000; //0.03 ETH
+contract PaCoExample is PaCoToken, ReentrancyGuard {
+    uint256 public constant mintPrice = 1;
     uint256 public constant MAX_SUPPLY = 10000;
 
     // Token name
@@ -14,6 +14,9 @@ contract PaCoExample is PaCoToken {
     string private _symbol;
     string internal baseURI;
     uint256 internal fee;
+
+    // tokenID to authroized bool
+    mapping(uint256 => bool) internal authorizedForTransfer;
 
     constructor(
         address tokenAddress,
@@ -47,6 +50,26 @@ contract PaCoExample is PaCoToken {
         for (uint256 i = 0; i < numberOfTokens; i++) {
             _mint(sender, tokenId, price, bond);
         }
+    }
+
+    function buyToken(
+        uint256 tokenId,
+        uint256 newPrice,
+        uint256 bondAmount
+    ) external override nonReentrant {
+        if (ownerOf(tokenId) == _msgSender()) revert ClaimingOwnNFT();
+        authorizedForTransfer[tokenId] = true;
+        _buyToken(tokenId, newPrice, bondAmount);
+        authorizedForTransfer[tokenId] = false;
+    }
+
+    function _tokenIsAuthorizedForTransfer(uint256 tokenId)
+        internal
+        view
+        override
+        returns (bool)
+    {
+        return authorizedForTransfer[tokenId];
     }
 
     // standard erc721metadata methods.
