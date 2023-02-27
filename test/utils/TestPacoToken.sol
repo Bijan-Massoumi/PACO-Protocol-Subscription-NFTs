@@ -12,6 +12,9 @@ abstract contract TestPacoToken is Test {
     TestToken bondToken;
     uint256 oneETH = 10**18;
 
+    //  cross chain address for seaport 1.1
+    address seaportAddress = 0x00000000006c3852cbEf3e08E8dF289169EdE581;
+
     address withdrawAddr = address(1137);
     address tokenWhale = 0xBecAa4aD36e5d134fD6979cc6780EB48aC5B5a93;
     address owner = address(1);
@@ -27,7 +30,12 @@ abstract contract TestPacoToken is Test {
         vm.prank(tokenWhale);
         bondToken.mint(oneETH * 1000000000);
         vm.startPrank(owner);
-        paco = new PaCoExample(address(bondToken), withdrawAddr, feeRate);
+        paco = new PaCoExample(
+            address(bondToken),
+            withdrawAddr,
+            feeRate,
+            seaportAddress
+        );
         vm.stopPrank();
 
         vm.prank(tokenWhale);

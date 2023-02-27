@@ -3,8 +3,10 @@
 pragma solidity 0.8.18;
 
 import "./PaCoToken.sol";
+import "./ZoneInterface.sol";
+import "./SeaportPaCoToken.sol";
 
-contract PaCoExample is PaCoToken, ReentrancyGuard {
+contract PaCoExample is SeaportPaCoToken, ReentrancyGuard {
     uint256 public constant mintPrice = 1;
     uint256 public constant MAX_SUPPLY = 10000;
 
@@ -15,14 +17,19 @@ contract PaCoExample is PaCoToken, ReentrancyGuard {
     string internal baseURI;
     uint256 internal fee;
 
-    // tokenID to authroized bool
-    mapping(uint256 => bool) internal authorizedForTransfer;
-
     constructor(
         address tokenAddress,
         address withdrawAddress,
-        uint16 selfAssessmentRate
-    ) PaCoToken(tokenAddress, withdrawAddress, selfAssessmentRate) {
+        uint16 selfAssessmentRate,
+        address seaportAddress
+    )
+        SeaportPaCoToken(
+            tokenAddress,
+            withdrawAddress,
+            selfAssessmentRate,
+            seaportAddress
+        )
+    {
         _name = "Example";
         _symbol = "EXE";
     }
@@ -40,18 +47,6 @@ contract PaCoExample is PaCoToken, ReentrancyGuard {
         _mint(numberOfTokens, msg.sender, mintIndex, price, bond);
     }
 
-    function _mint(
-        uint256 numberOfTokens,
-        address sender,
-        uint256 tokenId,
-        uint256 price,
-        uint256 bond
-    ) private {
-        for (uint256 i = 0; i < numberOfTokens; i++) {
-            _mint(sender, tokenId, price, bond);
-        }
-    }
-
     function buyToken(
         uint256 tokenId,
         uint256 newPrice,
@@ -63,13 +58,16 @@ contract PaCoExample is PaCoToken, ReentrancyGuard {
         authorizedForTransfer[tokenId] = false;
     }
 
-    function _tokenIsAuthorizedForTransfer(uint256 tokenId)
-        internal
-        view
-        override
-        returns (bool)
-    {
-        return authorizedForTransfer[tokenId];
+    function _mint(
+        uint256 numberOfTokens,
+        address sender,
+        uint256 tokenId,
+        uint256 price,
+        uint256 bond
+    ) private {
+        for (uint256 i = 0; i < numberOfTokens; i++) {
+            _mint(sender, tokenId, price, bond);
+        }
     }
 
     // standard erc721metadata methods.

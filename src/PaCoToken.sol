@@ -2,7 +2,6 @@
 pragma solidity 0.8.18;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "forge-std/Test.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./PaCoTokenEnumerable.sol";
@@ -343,39 +342,15 @@ abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         uint256 newPrice,
         uint256 bondAmount
     ) internal virtual {
+        uint256 price;
+        uint256 bond;
+        uint256 fees;
+        (price, bond, fees) = _getPriceBondFees(tokenId);
+
         address currentOwnerAddress = ownerOf(tokenId);
-
-        uint256 feesToReap;
-        uint256 liquidationStartedAt;
-        uint256 bondRemaining;
-        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
-        (
-            bondRemaining,
-            feesToReap,
-            liquidationStartedAt
-        ) = _getCurrentBondInfoForToken(currentOwnersBond);
-
-        if (liquidationStartedAt != 0) {
-            uint256 buyPrice = SafUtils.getLiquidationPrice(
-                currentOwnersBond.statedPrice,
-                block.timestamp - liquidationStartedAt,
-                halfLife
-            );
-            bondToken.safeTransferFrom(
-                msg.sender,
-                currentOwnerAddress,
-                buyPrice
-            );
-        } else {
-            bondToken.safeTransferFrom(
-                msg.sender,
-                currentOwnerAddress,
-                currentOwnersBond.statedPrice
-            );
-        }
-
-        bondToken.safeTransfer(currentOwnerAddress, bondRemaining);
-        creatorFees += feesToReap;
+        bondToken.safeTransferFrom(msg.sender, currentOwnerAddress, price);
+        bondToken.safeTransfer(currentOwnerAddress, bond);
+        creatorFees += fees;
 
         _swapAndPostBond(
             currentOwnerAddress,
@@ -385,6 +360,39 @@ abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             newPrice,
             bondAmount
         );
+    }
+
+    function _getPriceBondFees(uint256 tokenId)
+        internal
+        view
+        virtual
+        returns (
+            uint256,
+            uint256,
+            uint256
+        )
+    {
+        if (!_exists(tokenId)) revert TokenDoesntExist();
+        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
+        uint256 price = currentOwnersBond.statedPrice;
+        uint256 feesToReap;
+        uint256 liquidationStartedAt;
+        uint256 bondRemaining;
+        (
+            bondRemaining,
+            feesToReap,
+            liquidationStartedAt
+        ) = _getCurrentBondInfoForToken(currentOwnersBond);
+
+        if (liquidationStartedAt != 0) {
+            price = SafUtils.getLiquidationPrice(
+                currentOwnersBond.statedPrice,
+                block.timestamp - liquidationStartedAt,
+                halfLife
+            );
+        }
+
+        return (price, bondRemaining, feesToReap);
     }
 
     function _approve(address to, uint256 tokenId) internal virtual {
