@@ -543,12 +543,19 @@ abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         uint256 bondAmount
     ) internal virtual {
         _transfer(from, to, tokenId);
+        bondToken.safeTransferFrom(payer, address(this), bondAmount);
+        _postBond(to, tokenId, newPrice, bondAmount);
+    }
 
+    function _postBond(
+        address addr,
+        uint256 tokenId,
+        uint256 newPrice,
+        uint256 bondAmount
+    ) internal virtual {
         BondInfo storage bondInfoRef = _bondInfosAtLastCheckpoint[tokenId];
         _persistNewBondInfo(bondInfoRef, newPrice, bondAmount);
-        bondToken.safeTransferFrom(payer, address(this), bondAmount);
-
-        emit NewPriceBondSet(to, tokenId, newPrice, bondAmount);
+        emit NewPriceBondSet(addr, tokenId, newPrice, bondAmount);
     }
 
     function _checkOnERC721Received(

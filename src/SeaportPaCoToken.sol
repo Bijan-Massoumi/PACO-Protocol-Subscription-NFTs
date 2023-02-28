@@ -3,10 +3,15 @@
 pragma solidity 0.8.18;
 
 import "./PaCoToken.sol";
-import "./ZoneInterface.sol";
-import {ConsiderationItem, OfferItem, OrderType} from "./SeaportStructs.sol";
+import {ConsiderationItem, CriteriaResolver, AdvancedOrder, OfferItem, OrderType} from "./SeaportStructs.sol";
+import {SeaportInterface} from "./SeaportInterface.sol";
 
-abstract contract SeaportPaCoToken is PaCoToken, ZoneInterface {
+struct TokenWithPrice {
+    uint256 tokenId;
+    uint256 price;
+}
+
+abstract contract SeaportPaCoToken is PaCoToken {
     // only supports seaport 1.1
     address seaportAddress;
     // tokenID to authroized bool
@@ -14,13 +19,13 @@ abstract contract SeaportPaCoToken is PaCoToken, ZoneInterface {
 
     // Errors --------------------------------------------
 
-    error NonSeaportCaller();
+    error SeaportSwapFailed();
     error NotRestrictedFullOrder();
     error FufillerSameAsTokenOwner();
     error NonStaticAmount();
     error InsufficientOwnerPayment();
     error InsufficientZonePayment();
-    error NonBondToken();
+    error InvalidBondAmount();
 
     constructor(
         address tokenAddress,
@@ -31,55 +36,69 @@ abstract contract SeaportPaCoToken is PaCoToken, ZoneInterface {
         seaportAddress = _seaportAddress;
     }
 
-    function isValidOrder(
-        bytes32 orderHash,
-        address caller,
-        address offerer,
-        bytes32 zoneHash
-    ) external pure returns (bytes4 validOrderMagicValue) {
-        orderHash;
-        caller;
-        offerer;
-        zoneHash;
-        return bytes4(0xffffffff);
-    }
-
-    function isValidOrderIncludingExtraData(
-        bytes32 orderHash,
-        address caller,
-        AdvancedOrder calldata order,
-        bytes32[] calldata priorOrderHashes,
-        CriteriaResolver[] calldata criteriaResolvers
-    ) external view returns (bytes4 validOrderMagicValue) {
-        criteriaResolvers;
-        priorOrderHashes;
-        if (_msgSender() != seaportAddress) revert NonSeaportCaller();
-        if (order.parameters.orderType != OrderType.FULL_RESTRICTED)
+    function fulfillAdvancedOrder(
+        AdvancedOrder calldata advancedOrder,
+        CriteriaResolver[] calldata criteriaResolvers,
+        bytes32 fulfillerConduitKey,
+        address recipient,
+        uint256[] calldata newStatedPrices,
+        uint256[] calldata newBondAmounts
+    ) external payable returns (bool fulfilled) {
+        // Validate and fulfill the order.
+        if (advancedOrder.parameters.orderType != OrderType.FULL_RESTRICTED)
             revert NotRestrictedFullOrder();
 
-        uint256[] memory tokenIdsTransferred;
+        // verify consideration and offer
+        uint256[] memory offerTokenIds;
         uint256 totalPrice;
         uint256 totalBond;
-        (tokenIdsTransferred, totalPrice, totalBond) = _verifyOffer(
-            order.parameters.offer,
-            caller
+        (offerTokenIds, totalPrice, totalBond) = _verifyOffer(
+            advancedOrder.parameters.offer,
+            recipient
         );
-
-        uint256 bondPayment = _verifyConsideration(
-            order.parameters.consideration,
-            order.parameters.offerer,
+        uint256 bondPayedToPaco = _verifyConsideration(
+            advancedOrder.parameters.consideration,
+            advancedOrder.parameters.offerer,
             totalPrice,
             totalBond
         );
 
-        validOrderMagicValue = ZoneInterface.isValidOrder.selector;
+        // fulfill order and swap assets
+        for (uint256 i = 0; i < offerTokenIds.length; i++) {
+            authorizedForTransfer[offerTokenIds[i]] = true;
+        }
+        SeaportInterface seaport = SeaportInterface(seaportAddress);
+        if (
+            !seaport.fulfillAdvancedOrder(
+                advancedOrder,
+                criteriaResolvers,
+                fulfillerConduitKey,
+                recipient
+            )
+        ) revert SeaportSwapFailed();
+
+        // update bondInfo for each token transferred
+        uint256 totalbond = 0;
+        for (uint256 i = 0; i < offerTokenIds.length; i++) {
+            totalbond += newBondAmounts[i];
+            _postBond(
+                recipient,
+                offerTokenIds[i],
+                newStatedPrices[i],
+                newBondAmounts[i]
+            );
+            authorizedForTransfer[offerTokenIds[i]] = false;
+        }
+        if (bondPayedToPaco != totalBond) revert InvalidBondAmount();
+
+        return true;
     }
 
     function _verifyOffer(OfferItem[] memory offer, address caller)
         internal
         view
         returns (
-            uint256[] memory tokenIdsTransferred,
+            uint256[] memory offerTokenIds,
             uint256 totalPrice,
             uint256 totalBond
         )
@@ -97,8 +116,9 @@ abstract contract SeaportPaCoToken is PaCoToken, ZoneInterface {
                 offerItem.identifierOrCriteria
             );
 
-            tokenIdsTransferred[tokenIdsTransferred.length] = offerItem
+            offerTokenIds[offerTokenIds.length] = offerItem
                 .identifierOrCriteria;
+
             totalPrice += price;
             totalBond += bond;
         }
