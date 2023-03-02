@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import "../../src/PaCoExample.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./TestERC20.sol";
+import {AdvancedOrder, OrderParameters} from "../../src/SeaportStructs.sol";
 
 abstract contract TestPacoToken is Test {
     PaCoExample paco;
@@ -52,7 +53,14 @@ abstract contract TestPacoToken is Test {
     }
 
     function approveNewAddress(address addr) public {
-        vm.prank(addr);
+        vm.startPrank(addr);
         bondToken.approve(address(paco), oneETH * 10000);
+        bondToken.approve(seaportAddress, oneETH * 10000);
+        vm.stopPrank();
+    }
+
+    function approveSeaportPaco(address addr, uint256 tokenId) public {
+        vm.prank(addr);
+        paco.approve(seaportAddress, tokenId);
     }
 }

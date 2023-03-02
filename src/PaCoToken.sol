@@ -506,17 +506,41 @@ abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
             "ERC721: transfer of token that is not own"
         );
         require(to != address(0), "PaCo: transfer to the zero address");
+        require(
+            _tokenIsAuthorizedForTransfer(tokenId),
+            "PaCo: token not authorized"
+        );
+
         _beforeTokenTransfer(from, to, tokenId);
         // Check that tokenId was not transferred by `_beforeTokenTransfer` hook
         require(
             ownerOf(tokenId) == from,
             "PaCo: transfer from incorrect owner"
         );
-        require(
-            _tokenIsAuthorizedForTransfer(tokenId),
-            "PaCo: token not authorized"
-        );
+        // Clear approvals from the previous owner
+        delete _tokenApprovals[tokenId];
+        unchecked {
+            // `_balances[from]` cannot overflow for the same reason as described in `_burn`:
+            // `from`'s balance is the number of token held, which is at least one before the current
+            // transfer.
+            // `_balances[to]` could overflow in the conditions described in `_mint`. That would require
+            // all 2**256 token ids to be minted, which in practice is impossible.
+            _balances[from] -= 1;
+            _balances[to] += 1;
+        }
+        _owners[tokenId] = to;
+        emit Transfer(from, to, tokenId);
 
+        _afterTokenTransfer(from, to, tokenId);
+    }
+
+    function _transferInternal(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal virtual {
+        _beforeTokenTransfer(from, to, tokenId);
+        // Check that tokenId was not transferred by `_beforeTokenTransfer` hook
         // Clear approvals from the previous owner
         delete _tokenApprovals[tokenId];
         unchecked {

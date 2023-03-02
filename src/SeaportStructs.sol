@@ -2,6 +2,14 @@
 pragma solidity 0.8.18;
 
 /**
+ * @dev Orders require a signature in addition to the other order parameters.
+ */
+struct Order {
+    OrderParameters parameters;
+    bytes signature;
+}
+
+/**
  * @dev Advanced orders include a numerator (i.e. a fraction to attempt to fill)
  *      and a denominator (the total size of the order) in addition to the
  *      signature and other order parameters. It also supports an optional field

@@ -3,7 +3,6 @@
 pragma solidity 0.8.18;
 
 import "./PaCoToken.sol";
-import "./ZoneInterface.sol";
 import "./SeaportPaCoToken.sol";
 
 contract PaCoExample is SeaportPaCoToken, ReentrancyGuard {
@@ -67,6 +66,23 @@ contract PaCoExample is SeaportPaCoToken, ReentrancyGuard {
     ) private {
         for (uint256 i = 0; i < numberOfTokens; i++) {
             _mint(sender, tokenId, price, bond);
+        }
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal override {
+        if (from == address(0)) {
+            _addTokenToAllTokensEnumeration(tokenId);
+        } else if (from != to) {
+            _removeTokenFromOwnerEnumeration(from, tokenId, balanceOf(from));
+        }
+        if (to == address(0)) {
+            _removeTokenFromAllTokensEnumeration(tokenId);
+        } else if (to != from) {
+            _addTokenToOwnerEnumeration(to, tokenId, balanceOf(to));
         }
     }
 
