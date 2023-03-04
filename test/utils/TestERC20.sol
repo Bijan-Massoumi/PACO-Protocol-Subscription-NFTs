@@ -20,7 +20,6 @@ contract TestToken is ERC20 {
         uint256 amount
     ) public override returns (bool) {
         address spender = _msgSender();
-        console.log(spender, from, to, allowance(from, spender));
         _spendAllowance(from, spender, amount);
         _transfer(from, to, amount);
         return true;

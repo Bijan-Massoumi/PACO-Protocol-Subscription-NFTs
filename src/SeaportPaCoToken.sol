@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.18;
 
-import "./PaCoToken.sol";
+import "./PaCoTokenEnumerable.sol";
 import "forge-std/Test.sol";
 import {ConsiderationItem, CriteriaResolver, AdvancedOrder, OfferItem, OrderType, ItemType, OrderType, OrderParameters} from "./SeaportStructs.sol";
 import {SeaportInterface} from "./SeaportInterface.sol";
@@ -14,10 +14,9 @@ struct OwnerOwnedAmount {
     uint256 payed;
 }
 
-abstract contract SeaportPaCoToken is PaCoToken {
-    // only supports seaport 1.1
+abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
     address seaportAddress;
-    // tokenID to authroized bool
+    // tokenID to authorized bool
     mapping(uint256 => bool) internal authorizedForTransfer;
     using SafeERC20 for IERC20;
 
@@ -37,7 +36,7 @@ abstract contract SeaportPaCoToken is PaCoToken {
         address withdrawAddress,
         uint16 selfAssessmentRate,
         address _seaportAddress
-    ) PaCoToken(tokenAddress, withdrawAddress, selfAssessmentRate) {
+    ) PaCoTokenEnumerable(tokenAddress, withdrawAddress, selfAssessmentRate) {
         seaportAddress = _seaportAddress;
         bondToken.approve(seaportAddress, 2**256 - 1);
     }
@@ -81,7 +80,7 @@ abstract contract SeaportPaCoToken is PaCoToken {
         // fulfill order and swap assets
         for (uint256 i = 0; i < otiSize; i++) {
             authorizedForTransfer[offerTokenIds[i]] = true;
-            _transferAdmin(
+            _transferInternal(
                 ownerOf(offerTokenIds[i]),
                 address(this),
                 offerTokenIds[i]

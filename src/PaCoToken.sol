@@ -4,13 +4,13 @@ pragma solidity 0.8.18;
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./PaCoTokenEnumerable.sol";
 import "./BondTracker.sol";
+import "./IPaCoToken.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
+abstract contract PaCoToken is IPaCoToken, BondTracker {
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -136,19 +136,6 @@ abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         halfLife = newHalfLife;
     }
 
-    function getTokenIdsForAddress(address owner)
-        external
-        view
-        returns (uint256[] memory)
-    {
-        uint256 size = balanceOf(owner);
-        uint256[] memory tokenIds = new uint256[](size);
-        for (uint256 i = 0; i < size; i++) {
-            tokenIds[i] = tokenOfOwnerByIndex(owner, i);
-        }
-        return tokenIds;
-    }
-
     function getPrice(uint256 tokenId)
         external
         view
@@ -267,38 +254,6 @@ abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         require(_exists(tokenId), "PaCo: approved query for nonexistent token");
 
         return _tokenApprovals[tokenId];
-    }
-
-    function tokenOfOwnerByIndex(address owner, uint256 index)
-        public
-        view
-        virtual
-        override
-        returns (uint256)
-    {
-        require(
-            index < balanceOf(owner),
-            "ERC721Enumerable: owner index out of bounds"
-        );
-        return _ownedTokens[owner][index];
-    }
-
-    function totalSupply() public view virtual override returns (uint256) {
-        return _allTokens.length;
-    }
-
-    function tokenByIndex(uint256 index)
-        public
-        view
-        virtual
-        override
-        returns (uint256)
-    {
-        require(
-            index < totalSupply(),
-            "ERC721Enumerable: global index out of bounds"
-        );
-        return _allTokens[index];
     }
 
     function safeTransferFrom(
@@ -639,21 +594,12 @@ abstract contract PaCoToken is PaCoTokenEnumerable, BondTracker {
         address from,
         address to,
         uint256 tokenId
-    ) internal virtual {
-        if (from == address(0)) {
-            _addTokenToAllTokensEnumeration(tokenId);
-        } else if (from != to) {
-            _removeTokenFromOwnerEnumeration(from, tokenId, balanceOf(from));
-        }
-        if (to == address(0)) {
-            _removeTokenFromAllTokensEnumeration(tokenId);
-        } else if (to != from) {
-            _addTokenToOwnerEnumeration(to, tokenId, balanceOf(to));
-        }
-    }
+    ) internal virtual {}
 
     function _tokenIsAuthorizedForTransfer(uint256 tokenId)
         internal
+        view
         virtual
-        returns (bool);
+        returns (bool)
+    {}
 }

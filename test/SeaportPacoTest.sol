@@ -60,7 +60,6 @@ contract SeaportPacoTest is TestPacoToken {
         uint256[] memory bonds = new uint256[](1);
         bonds[0] = newBond;
 
-        console.log("before", tokenWhale);
         vm.prank(owner);
         paco.fulfillOrder(offer, consideration, prices, bonds);
     }

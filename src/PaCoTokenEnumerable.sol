@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
-import "./IPaCoToken.sol";
+import "./PaCoToken.sol";
 
-abstract contract PaCoTokenEnumerable is IPaCoToken {
+abstract contract PaCoTokenEnumerable is PaCoToken {
     // Mapping from owner to list of owned token IDs
     mapping(address => mapping(uint256 => uint256)) internal _ownedTokens;
 
@@ -15,30 +15,48 @@ abstract contract PaCoTokenEnumerable is IPaCoToken {
     // Mapping from token id to position in the allTokens array
     mapping(uint256 => uint256) internal _allTokensIndex;
 
+    constructor(
+        address _erc20Address,
+        address _withdrawAddress,
+        uint16 _selfAssessmentRate
+    ) PaCoToken(_erc20Address, _withdrawAddress, _selfAssessmentRate) {}
+
     /**
      * @dev Returns the total amount of tokens stored by the contract.
      */
-    function totalSupply() external view virtual returns (uint256);
+    function totalSupply() public view virtual returns (uint256) {
+        return _allTokens.length;
+    }
 
     /**
      * @dev Returns a token ID owned by `owner` at a given `index` of its token list.
      * Use along with {balanceOf} to enumerate all of ``owner``'s tokens.
      */
-    function tokenOfOwnerByIndex(address owner, uint256 index)
+    function getTokenIdsForAddress(address owner)
         external
         view
         virtual
-        returns (uint256 tokenId);
+        returns (uint256[] memory)
+    {
+        uint256 size = balanceOf(owner);
+        uint256[] memory tokenIds = new uint256[](size);
+        for (uint256 i = 0; i < size; i++) {
+            tokenIds[i] = tokenOfOwnerByIndex(owner, i);
+        }
+        return tokenIds;
+    }
 
     /**
      * @dev Returns a token ID at a given `index` of all the tokens stored by the contract.
      * Use along with {totalSupply} to enumerate all tokens.
      */
-    function tokenByIndex(uint256 index)
-        external
-        view
-        virtual
-        returns (uint256);
+    function tokenByIndex(uint256 index) public view virtual returns (uint256) {
+        require(
+            index < totalSupply(),
+            "PaCoTokenEnumerable: global index out of bounds"
+        );
+        return _allTokens[index];
+    }
 
     /**
      * @dev Private function to add a token to this extension's ownership-tracking data structures.
@@ -118,5 +136,35 @@ abstract contract PaCoTokenEnumerable is IPaCoToken {
         // This also deletes the contents at the last position of the array
         delete _allTokensIndex[tokenId];
         _allTokens.pop();
+    }
+
+    function tokenOfOwnerByIndex(address owner, uint256 index)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
+        require(
+            index < balanceOf(owner),
+            "PaCoTokenEnumerable: owner index out of bounds"
+        );
+        return _ownedTokens[owner][index];
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal virtual override {
+        if (from == address(0)) {
+            _addTokenToAllTokensEnumeration(tokenId);
+        } else if (from != to) {
+            _removeTokenFromOwnerEnumeration(from, tokenId, balanceOf(from));
+        }
+        if (to == address(0)) {
+            _removeTokenFromAllTokensEnumeration(tokenId);
+        } else if (to != from) {
+            _addTokenToOwnerEnumeration(to, tokenId, balanceOf(to));
+        }
     }
 }
