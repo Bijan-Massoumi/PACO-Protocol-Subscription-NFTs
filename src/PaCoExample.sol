@@ -3,11 +3,13 @@
 pragma solidity 0.8.18;
 
 import "./PaCoToken.sol";
-import "./SeaportPaCoToken.sol";
+import "./PaCoTokenEnumerable.sol";
 
-contract PaCoExample is SeaportPaCoToken, ReentrancyGuard {
+contract PaCoExample is PaCoTokenEnumerable, ReentrancyGuard {
     uint256 public constant mintPrice = 1;
     uint256 public constant MAX_SUPPLY = 10000;
+
+    mapping(uint256 => bool) internal authorizedForTransfer;
 
     // Token name
     string private _name;
@@ -19,16 +21,8 @@ contract PaCoExample is SeaportPaCoToken, ReentrancyGuard {
     constructor(
         address tokenAddress,
         address withdrawAddress,
-        uint16 selfAssessmentRate,
-        address seaportAddress
-    )
-        SeaportPaCoToken(
-            tokenAddress,
-            withdrawAddress,
-            selfAssessmentRate,
-            seaportAddress
-        )
-    {
+        uint16 selfAssessmentRate
+    ) PaCoTokenEnumerable(tokenAddress, withdrawAddress, selfAssessmentRate) {
         _name = "Example";
         _symbol = "EXE";
     }
@@ -51,7 +45,7 @@ contract PaCoExample is SeaportPaCoToken, ReentrancyGuard {
         uint256 newPrice,
         uint256 bondAmount
     ) external override nonReentrant {
-        if (ownerOf(tokenId) == _msgSender()) revert ClaimingOwnNFT();
+        if (ownerOf(tokenId) == msg.sender) revert ClaimingOwnNFT();
         authorizedForTransfer[tokenId] = true;
         _buyToken(tokenId, newPrice, bondAmount);
         authorizedForTransfer[tokenId] = false;
@@ -69,40 +63,12 @@ contract PaCoExample is SeaportPaCoToken, ReentrancyGuard {
         }
     }
 
-    // standard erc721metadata methods.
-
-    /**
-     * @dev See {IERC721Metadata-name}.
-     */
-    function name() public view virtual returns (string memory) {
-        return _name;
-    }
-
-    /**
-     * @dev See {IERC721Metadata-symbol}.
-     */
-    function symbol() public view virtual returns (string memory) {
-        return _symbol;
-    }
-
-    /**
-     * @dev Returns the Uniform Resource Identifier (URI) for `tokenId` token.
-     */
-    function tokenURI(uint256 tokenId)
-        public
+    function _tokenIsAuthorizedForTransfer(uint256 tokenId)
+        internal
         view
-        virtual
-        returns (string memory)
+        override
+        returns (bool)
     {
-        require(
-            _exists(tokenId),
-            "ERC721Metadata: URI query for nonexistent token"
-        );
-
-        return "ipfs://QmVXMMj5eBikicjViQLtqJDVVgupbFr3miFeo2pZmCX2kC";
-    }
-
-    function setBaseURI(string memory newBaseURI) public onlyOwner {
-        baseURI = newBaseURI;
+        return authorizedForTransfer[tokenId];
     }
 }

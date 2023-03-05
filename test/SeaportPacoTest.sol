@@ -6,10 +6,10 @@ import "../src/PaCoExample.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/Test.sol";
 import "../src/SafUtils.sol";
-import "./utils/TestPacoToken.sol";
+import "./utils/TestSeaportPacoToken.sol";
 import {OfferItem, ConsiderationItem} from "../src/SeaportStructs.sol";
 
-contract SeaportPacoTest is TestPacoToken {
+contract SeaportPacoTest is TestSeaportPacoToken {
     uint256 whaleTokenId;
     uint256 ownerTokenId;
 

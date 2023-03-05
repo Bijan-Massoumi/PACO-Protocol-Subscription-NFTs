@@ -18,6 +18,7 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
     address seaportAddress;
     // tokenID to authorized bool
     mapping(uint256 => bool) internal authorizedForTransfer;
+    mapping(uint256 => address) internal seaportOwner;
     using SafeERC20 for IERC20;
 
     // Errors --------------------------------------------
@@ -30,6 +31,7 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
     error InsufficientZonePayment();
     error NonExactBondAmount();
     error UnknownRecipient();
+    error InvalidOwner();
 
     constructor(
         address tokenAddress,
@@ -48,7 +50,7 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
         uint256[] calldata newStatedPrices,
         uint256[] calldata newBondAmounts
     ) external payable returns (bool fulfilled) {
-        // verify consideration and offer
+        // validate consideration and offer
         uint256[] memory offerTokenIds;
         uint256 otiSize = 0;
         OwnerOwnedAmount[] memory amountDueToTokenOwners;
@@ -60,14 +62,14 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
             amountDueToTokenOwners,
             amountDueSize,
             totalSenderCollect
-        ) = _preprocessOffer(offer, msg.sender);
+        ) = _preprocessOffer(offer);
         _verifyConsideration(
             consideration,
             amountDueToTokenOwners,
             amountDueSize
         );
 
-        // collect payment from msg.sender
+        // collect payment from msg.sender for purchased token bonds
         for (uint256 i = 0; i < newBondAmounts.length; i++) {
             totalSenderCollect == newBondAmounts[i];
         }
@@ -79,14 +81,7 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
 
         // fulfill order and swap assets
         for (uint256 i = 0; i < otiSize; i++) {
-            authorizedForTransfer[offerTokenIds[i]] = true;
-            _transferInternal(
-                ownerOf(offerTokenIds[i]),
-                address(this),
-                offerTokenIds[i]
-            );
-            // TODO change to operator approval
-            _approve(seaportAddress, offerTokenIds[i]);
+            _prepareTokenForSeaportTransfer(offerTokenIds[i]);
         }
         _fufillOrder(offer, consideration);
 
@@ -143,7 +138,7 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
         ) revert SeaportSwapFailed();
     }
 
-    function _preprocessOffer(OfferItem[] memory offer, address caller)
+    function _preprocessOffer(OfferItem[] memory offer)
         internal
         view
         returns (
@@ -169,7 +164,7 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
             OfferItem memory offerItem = offer[i];
             address owner = ownerOf(offerItem.identifierOrCriteria);
             if (offerItem.token != address(this)) revert NonPacoToken();
-            if (owner == caller) revert FufillerSameAsTokenOwner();
+            if (owner == msg.sender) revert FufillerSameAsTokenOwner();
 
             uint256 price;
             uint256 bond;
@@ -239,6 +234,32 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
                 amountDueToTokenOwners[i].owed > amountDueToTokenOwners[i].payed
             ) revert InsufficientOwnerPayment();
         }
+    }
+
+    function _prepareTokenForSeaportTransfer(uint256 tokenId) internal {
+        address currentOwner = ownerOf(tokenId);
+        seaportOwner[tokenId] = currentOwner;
+        _owners[tokenId] = address(this);
+        authorizedForTransfer[tokenId] = true;
+    }
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public override {
+        from;
+        //solhint-disable-next-line max-line-length
+        require(
+            _msgSender() == seaportAddress,
+            "Common Partial: transfer caller is not seaport"
+        );
+        address currentOwner = seaportOwner[tokenId];
+        if (currentOwner == address(0)) revert InvalidOwner();
+
+        _owners[tokenId] = currentOwner;
+        _transfer(currentOwner, to, tokenId);
+        delete seaportOwner[tokenId];
     }
 
     function _tokenIsAuthorizedForTransfer(uint256 tokenId)
