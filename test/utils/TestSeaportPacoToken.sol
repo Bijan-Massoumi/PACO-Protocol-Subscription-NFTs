@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import "../../src/PaCoSeaportExample.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./TestERC20.sol";
-import {AdvancedOrder, OrderParameters} from "../../src/SeaportStructs.sol";
+import {OfferItem, ConsiderationItem} from "../../src/SeaportStructs.sol";
 
 abstract contract TestSeaportPacoToken is Test {
     PaCoSeaportExample paco;
@@ -58,6 +58,9 @@ abstract contract TestSeaportPacoToken is Test {
         vm.stopPrank();
 
         // mint multiple paco tokens to each wallet
+        // 0x01: tokenIds 0, 1, 2
+        // 0x02: tokenIds 3, 4, 5
+        // 0x03: tokenIds 6, 7, 8
         vm.prank(owner);
         paco.mint(3, oneETH * 10, oneETH * 4);
         vm.prank(addr2);
@@ -76,5 +79,45 @@ abstract contract TestSeaportPacoToken is Test {
     function approveSeaportPaco(address addr, uint256 tokenId) public {
         vm.prank(addr);
         paco.approve(seaportAddress, tokenId);
+    }
+
+    function createOfferForTokenIds(uint256[] memory tokenIds)
+        public
+        view
+        returns (OfferItem[] memory)
+    {
+        OfferItem[] memory offer = new OfferItem[](tokenIds.length);
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            offer[i] = OfferItem(
+                ItemType.ERC721,
+                address(paco),
+                tokenIds[i],
+                1,
+                1
+            );
+        }
+        return offer;
+    }
+
+    function createConsiderationForTokenIds(uint256[] memory tokenIds)
+        public
+        view
+        returns (ConsiderationItem[] memory, uint256)
+    {
+        ConsiderationItem[] memory consideration = new ConsiderationItem[](
+            tokenIds.length
+        );
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            uint256 price = paco.getPrice(tokenIds[i]);
+            consideration[i] = ConsiderationItem(
+                ItemType.ERC20,
+                address(bondToken),
+                0,
+                price,
+                price,
+                payable(paco.ownerOf(tokenIds[i]))
+            );
+        }
+        return (consideration, consideration.length);
     }
 }

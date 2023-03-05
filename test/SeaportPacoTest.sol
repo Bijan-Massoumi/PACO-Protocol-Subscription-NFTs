@@ -23,40 +23,25 @@ contract SeaportPacoTest is TestSeaportPacoToken {
         uint256[] memory whaleTokens = paco.getTokenIdsForAddress(tokenWhale);
         whaleTokenId = whaleTokens[0];
 
-        vm.startPrank(owner);
-        paco.mint(1, oneETH * 10, oneETH * 5);
-        bondToken.approve(seaportAddress, oneETH * 10000);
-        vm.stopPrank();
         uint256[] memory ownedTokens = paco.getTokenIdsForAddress(owner);
         ownerTokenId = ownedTokens[0];
     }
 
     function testSeaportTx() public {
-        OfferItem[] memory offer = new OfferItem[](1);
-        offer[0] = OfferItem(
-            ItemType.ERC721,
-            address(paco),
-            whaleTokenId,
-            1,
-            1
-        );
+        uint256[] memory tokenIds = new uint256[](1);
+        tokenIds[0] = whaleTokenId;
+        OfferItem[] memory offer = createOfferForTokenIds(tokenIds);
 
-        uint256 price = paco.getPrice(whaleTokenId);
-        ConsiderationItem[] memory consideration = new ConsiderationItem[](1);
-        consideration[0] = ConsiderationItem(
-            ItemType.ERC20,
-            address(bondToken),
-            0,
-            price,
-            price,
-            payable(paco.ownerOf(whaleTokenId))
-        );
+        uint256 size;
+        ConsiderationItem[] memory consideration;
+        (consideration, size) = createConsiderationForTokenIds(tokenIds);
 
+        uint256 newPrice = oneETH * 10;
         uint256[] memory prices = new uint256[](1);
-        prices[0] = price;
+        prices[0] = newPrice;
 
         uint256 minBond = 1000;
-        uint256 newBond = ((price * minBond) / 10000) + 1;
+        uint256 newBond = ((newPrice * minBond) / 10000) + 1;
         uint256[] memory bonds = new uint256[](1);
         bonds[0] = newBond;
 
