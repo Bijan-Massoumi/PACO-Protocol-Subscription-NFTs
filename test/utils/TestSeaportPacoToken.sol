@@ -8,6 +8,11 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./TestERC20.sol";
 import {OfferItem, ConsiderationItem} from "../../src/SeaportStructs.sol";
 
+struct OwnerBalance {
+    uint256 ownerBalance;
+    address owner;
+}
+
 abstract contract TestSeaportPacoToken is Test {
     PaCoSeaportExample paco;
     TestToken bondToken;
@@ -119,5 +124,19 @@ abstract contract TestSeaportPacoToken is Test {
             );
         }
         return (consideration, consideration.length);
+    }
+
+    function getOwnerWithPrevBalances(uint256[] memory tokenIds)
+        public
+        view
+        returns (OwnerBalance[] memory)
+    {
+        OwnerBalance[] memory ownerBal = new OwnerBalance[](tokenIds.length);
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            address tokenOwner = paco.ownerOf(tokenIds[i]);
+            uint256 ownerBalance = bondToken.balanceOf(owner);
+            ownerBal[i] = OwnerBalance(ownerBalance, tokenOwner);
+        }
+        return ownerBal;
     }
 }
