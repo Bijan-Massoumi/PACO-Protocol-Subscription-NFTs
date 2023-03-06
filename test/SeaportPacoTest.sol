@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.18;
 
-import "../src/PaCoExample.sol";
+import "../src/PacoExample.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/Test.sol";
 import "../src/SafUtils.sol";
@@ -53,7 +53,9 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         for (uint256 i = 0; i < multiPrices.length; i++) {
             uint256 newPrice = multiPrices[i];
-            multiSubscriptionPools.push(((newPrice * minSubscriptionPool) / 10000) + 1);
+            multiSubscriptionPools.push(
+                ((newPrice * minSubscriptionPool) / 10000) + 1
+            );
         }
         prevContractBalance = subscriptionPoolToken.balanceOf(address(paco));
     }
@@ -79,9 +81,12 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         uint256 cost = consideration[0].endAmount;
         uint256 beforeBalance = subscriptionPoolToken.balanceOf(tokenWhale);
-        uint256 remainingSubscriptionPool = paco.getSubscriptionPool(whaleTokenId);
+        uint256 remainingSubscriptionPool = paco.getSubscriptionPool(
+            whaleTokenId
+        );
 
-        uint256 newSubscriptionPool = ((newPrice * minSubscriptionPool) / 10000) + 1;
+        uint256 newSubscriptionPool = ((newPrice * minSubscriptionPool) /
+            10000) + 1;
         uint256[] memory subscriptionPools = new uint256[](1);
         subscriptionPools[0] = newSubscriptionPool;
         vm.prank(owner);
@@ -95,7 +100,9 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
         assertEq(paco.getPrice(whaleTokenId), newPrice);
         assertEq(
             subscriptionPoolToken.balanceOf(address(paco)),
-            prevContractBalance + newSubscriptionPool - remainingSubscriptionPool
+            prevContractBalance +
+                newSubscriptionPool -
+                remainingSubscriptionPool
         );
     }
 
@@ -117,7 +124,12 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         OwnerBalance[] memory prevBalances = getOwnerWithPrevBalances(tokenIds);
         vm.prank(tokenWhale);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
+        paco.fulfillOrder(
+            offer,
+            consideration,
+            multiPrices,
+            multiSubscriptionPools
+        );
         assertEq(paco.ownerOf(0), tokenWhale);
         assertEq(paco.ownerOf(4), tokenWhale);
         assertEq(paco.ownerOf(7), tokenWhale);
@@ -178,7 +190,12 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         OwnerBalance[] memory prevBalances = getOwnerWithPrevBalances(tokenIds);
         vm.prank(tokenWhale);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
+        paco.fulfillOrder(
+            offer,
+            consideration,
+            multiPrices,
+            multiSubscriptionPools
+        );
 
         assertEq(paco.ownerOf(0), tokenWhale);
         assertEq(paco.ownerOf(4), tokenWhale);
@@ -227,7 +244,12 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         vm.prank(tokenWhale);
         vm.expectRevert(NonPacoToken.selector);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
+        paco.fulfillOrder(
+            offer,
+            consideration,
+            multiPrices,
+            multiSubscriptionPools
+        );
 
         offer = createOfferForTokenIds(tokenIds, emptyOfferItem);
         (consideration, size) = createConsiderationForTokenIds(
@@ -244,7 +266,12 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         vm.prank(tokenWhale);
         vm.expectRevert(NonSubscriptionPoolToken.selector);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
+        paco.fulfillOrder(
+            offer,
+            consideration,
+            multiPrices,
+            multiSubscriptionPools
+        );
     }
 
     function testRevertInsufficientOwnerPayment() public {
@@ -271,6 +298,11 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         vm.prank(tokenWhale);
         vm.expectRevert(InsufficientOwnerPayment.selector);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
+        paco.fulfillOrder(
+            offer,
+            consideration,
+            multiPrices,
+            multiSubscriptionPools
+        );
     }
 }

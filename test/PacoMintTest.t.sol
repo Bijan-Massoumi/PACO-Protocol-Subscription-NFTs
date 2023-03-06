@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.18;
 
-import "../src/PaCoExample.sol";
+import "../src/PacoExample.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/Test.sol";
 import "../src/SafUtils.sol";
@@ -19,7 +19,9 @@ contract PacoMintTest is TestPacoToken {
         assertEq(ownedTokens.length, 1);
         uint256 mintedTokenId = ownedTokens[0];
         vm.warp(startBlockTimestamp + 5000);
-        uint256 startOnchainSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        uint256 startOnchainSubscriptionPool = paco.getSubscriptionPool(
+            mintedTokenId
+        );
         uint256 feeCollected = SafUtils._calculateSafBetweenTimes(
             statedPrice,
             startBlockTimestamp,

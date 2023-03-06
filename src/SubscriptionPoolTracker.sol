@@ -3,6 +3,7 @@ pragma solidity 0.8.18;
 
 import "./SafUtils.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./ISubscriptionPoolTrackerErrors.sol";
 
 struct SubscriptionPoolInfo {
     uint256 statedPrice;
@@ -16,7 +17,10 @@ struct FeeChangeTimestamp {
     uint256 previousRate;
 }
 
-abstract contract SubscriptionPoolTracker is Ownable {
+abstract contract SubscriptionPoolTracker is
+    Ownable,
+    ISubscriptionPoolTrackerErrors
+{
     mapping(uint256 => SubscriptionPoolInfo)
         internal _subscriptionPoolInfosAtLastCheckpoint;
     FeeChangeTimestamp[] feeChangeTimestamps;
@@ -28,15 +32,6 @@ abstract contract SubscriptionPoolTracker is Ownable {
     uint256 internal selfAssessmentRate;
     // 100% fee rate
     uint256 internal maxSelfAssessmentRate = 10000;
-
-    /// ============ Errors ============
-    /// @notice Thrown if invalid price values
-    error InvalidAlterPriceValue();
-    /// @notice Thrown if invalid subscriptionPool values
-    error InvalidAlterSubscriptionPoolValue();
-    /// @notice Thrown if subscriptionPool isnt enough to cover miminum subscriptionPool
-    error InsufficientSubscriptionPool();
-    error InvalidAssessmentFee();
 
     constructor(uint256 _selfAssessmentRate) {
         selfAssessmentRate = _selfAssessmentRate;

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.18;
-import "./PaCoToken.sol";
+import "./PacoToken.sol";
 
-abstract contract PaCoTokenEnumerable is PaCoToken {
+abstract contract PacoTokenEnumerable is PacoToken {
     // Mapping from owner to list of owned token IDs
     mapping(address => mapping(uint256 => uint256)) internal _ownedTokens;
 
@@ -19,7 +19,7 @@ abstract contract PaCoTokenEnumerable is PaCoToken {
         address _erc20Address,
         address _withdrawAddress,
         uint16 _selfAssessmentRate
-    ) PaCoToken(_erc20Address, _withdrawAddress, _selfAssessmentRate) {}
+    ) PacoToken(_erc20Address, _withdrawAddress, _selfAssessmentRate) {}
 
     /**
      * @dev Returns the total amount of tokens stored by the contract.
@@ -53,7 +53,7 @@ abstract contract PaCoTokenEnumerable is PaCoToken {
     function tokenByIndex(uint256 index) public view virtual returns (uint256) {
         require(
             index < totalSupply(),
-            "PaCoTokenEnumerable: global index out of bounds"
+            "PacoTokenEnumerable: global index out of bounds"
         );
         return _allTokens[index];
     }
@@ -146,7 +146,7 @@ abstract contract PaCoTokenEnumerable is PaCoToken {
     {
         require(
             index < balanceOf(owner),
-            "PaCoTokenEnumerable: owner index out of bounds"
+            "PacoTokenEnumerable: owner index out of bounds"
         );
         return _ownedTokens[owner][index];
     }

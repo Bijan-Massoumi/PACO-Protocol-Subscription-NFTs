@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { PaCoExample__factory } from "../typechain/factories/PaCoExample__factory";
+import { PacoExample__factory } from "../typechain/factories/PacoExample__factory";
 import { wethAddress } from "./common";
 
 const RPC = process.env.RPC;
@@ -16,7 +16,7 @@ async function deployContract() {
   const selfAssessmentRate = 2000;
 
   const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-  const pacoFactory = new PaCoExample__factory(wallet);
+  const pacoFactory = new PacoExample__factory(wallet);
   const contract = await pacoFactory.deploy(
     wethAddress,
     withdrawAddress,

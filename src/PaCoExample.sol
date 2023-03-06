@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.18;
 
-import "./PaCoToken.sol";
-import "./PaCoTokenEnumerable.sol";
+import "./PacoToken.sol";
+import "./PacoTokenEnumerable.sol";
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract PaCoExample is PaCoTokenEnumerable, ReentrancyGuard {
+contract PacoExample is PacoTokenEnumerable, ReentrancyGuard {
     uint256 public constant mintPrice = 1;
     uint256 public constant MAX_SUPPLY = 10000;
 
@@ -24,7 +24,7 @@ contract PaCoExample is PaCoTokenEnumerable, ReentrancyGuard {
         address tokenAddress,
         address withdrawAddress,
         uint16 selfAssessmentRate
-    ) PaCoTokenEnumerable(tokenAddress, withdrawAddress, selfAssessmentRate) {
+    ) PacoTokenEnumerable(tokenAddress, withdrawAddress, selfAssessmentRate) {
         _name = "Example";
         _symbol = "EXE";
     }

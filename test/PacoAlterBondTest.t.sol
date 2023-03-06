@@ -2,18 +2,20 @@
 
 pragma solidity 0.8.18;
 
-import "../src/PaCoExample.sol";
+import "../src/PacoExample.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "forge-std/Test.sol";
 import "../src/SafUtils.sol";
 import "./utils/TestPacoToken.sol";
+import "../src/ISubscriptionPoolTrackerErrors.sol";
 
-contract PacoAlterSubscriptionPoolTest is TestPacoToken {
+contract PacoAlterSubscriptionPoolTest is
+    TestPacoToken,
+    ISubscriptionPoolTrackerErrors
+{
     uint256 mintedTokenId;
     uint256 startOnchainSubscriptionPool;
     uint256 startOnchainPrice;
-
-    error InsufficientSubscriptionPool();
 
     function setUp() public override {
         super.setUp();
@@ -34,7 +36,10 @@ contract PacoAlterSubscriptionPoolTest is TestPacoToken {
         paco.increaseSubscriptionPool(mintedTokenId, oneETH * 2);
         uint256 newSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
         uint256 newBalance = subscriptionPoolToken.balanceOf(tokenWhale);
-        assertEq(newSubscriptionPool, startOnchainSubscriptionPool + oneETH * 2);
+        assertEq(
+            newSubscriptionPool,
+            startOnchainSubscriptionPool + oneETH * 2
+        );
         assertEq(newBalance, prevBalance - oneETH * 2);
     }
 
@@ -82,7 +87,10 @@ contract PacoAlterSubscriptionPoolTest is TestPacoToken {
         uint256 newSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
         uint256 newPrice = paco.getPrice(mintedTokenId);
         assertEq(newPrice, startOnchainPrice + oneETH);
-        assertEq(newSubscriptionPool, startOnchainSubscriptionPool + oneETH * 2);
+        assertEq(
+            newSubscriptionPool,
+            startOnchainSubscriptionPool + oneETH * 2
+        );
     }
 
     function testFailAlterRevertsWithSubscriptionPoolTooLittle() public {

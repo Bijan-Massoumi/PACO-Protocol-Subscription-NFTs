@@ -3,7 +3,7 @@
 pragma solidity 0.8.18;
 
 import "forge-std/Test.sol";
-import "../../src/PaCoSeaportExample.sol";
+import "../../src/PacoSeaportExample.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./TestERC20.sol";
 import {OfferItem, ConsiderationItem} from "../../src/SeaportStructs.sol";
@@ -15,7 +15,7 @@ struct OwnerBalance {
 }
 
 abstract contract TestSeaportPacoToken is Test {
-    PaCoSeaportExample paco;
+    PacoSeaportExample paco;
     TestToken subscriptionPoolToken;
     uint256 oneETH = 10**18;
 
@@ -38,7 +38,7 @@ abstract contract TestSeaportPacoToken is Test {
         vm.prank(tokenWhale);
         subscriptionPoolToken.mint(oneETH * 1000000000);
         vm.startPrank(owner);
-        paco = new PaCoSeaportExample(
+        paco = new PacoSeaportExample(
             address(subscriptionPoolToken),
             withdrawAddr,
             feeRate,
@@ -46,7 +46,7 @@ abstract contract TestSeaportPacoToken is Test {
         );
         vm.stopPrank();
 
-        // approve PaCo allowance for subscriptionPool token
+        // approve Paco allowance for subscriptionPool token
         vm.prank(tokenWhale);
         subscriptionPoolToken.approve(address(paco), oneETH * 10000);
         vm.prank(owner);

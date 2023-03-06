@@ -1,4 +1,4 @@
-## A PaCo (Partial Common Ownership) NFT is a modified ERC-721 contract where every NFT is always on sale at a price set by its owner.
+## A Paco (Partial Common Ownership) NFT is a modified ERC-721 contract where every NFT is always on sale at a price set by its owner.
 
 ### What’s stopping someone from setting the price to a billion dollars?
 

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.18;
 
-import "./PaCoTokenEnumerable.sol";
+import "./PacoTokenEnumerable.sol";
 import "forge-std/Test.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {ConsiderationItem, CriteriaResolver, AdvancedOrder, OfferItem, OrderType, ItemType, OrderType, OrderParameters} from "./SeaportStructs.sol";
@@ -21,8 +21,8 @@ struct Tip {
     uint256 amount;
 }
 
-abstract contract SeaportPaCoToken is
-    PaCoTokenEnumerable,
+abstract contract SeaportPacoToken is
+    PacoTokenEnumerable,
     ISeaportErrors,
     ReentrancyGuard
 {
@@ -39,7 +39,7 @@ abstract contract SeaportPaCoToken is
         address withdrawAddress,
         uint16 selfAssessmentRate,
         address _seaportAddress
-    ) PaCoTokenEnumerable(tokenAddress, withdrawAddress, selfAssessmentRate) {
+    ) PacoTokenEnumerable(tokenAddress, withdrawAddress, selfAssessmentRate) {
         seaportAddress = _seaportAddress;
         subscriptionPoolToken.approve(seaportAddress, 2**256 - 1);
     }

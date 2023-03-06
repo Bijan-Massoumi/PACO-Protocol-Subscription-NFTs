@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "forge test --fork-url $RPC -vv ",
-    "build": "forge build ; typechain --target=ethers-v5 --out-dir ./typechain ./out/PaCoExample.sol/PaCoExample.json",
+    "build": "forge build ; typechain --target=ethers-v5 --out-dir ./typechain ./out/PacoExample.sol/PacoExample.json",
     "startNode": "anvil -m 'test test test test test test test test test test test junk'"
   },
   "keywords": [],

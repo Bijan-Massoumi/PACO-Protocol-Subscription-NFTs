@@ -3,7 +3,7 @@
 pragma solidity 0.8.18;
 
 //inspired by ERC721 and ERC721Enumerable
-interface IPaCoToken {
+interface IPacoToken {
     event Transfer(address from, address to, uint256 _tokenId);
 
     event NewPriceSubscriptionPoolSet(
@@ -23,7 +23,10 @@ interface IPaCoToken {
 
     function ownerOf(uint256 tokenId) external view returns (address owner);
 
-    function getSubscriptionPool(uint256 _tokenId) external view returns (uint256);
+    function getSubscriptionPool(uint256 _tokenId)
+        external
+        view
+        returns (uint256);
 
     function getPrice(uint256 _tokenId) external view returns (uint256);
 

@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { PaCoExample__factory } from "../typechain/factories/PaCoExample__factory";
+import { PacoExample__factory } from "../typechain/factories/PacoExample__factory";
 import { wethAddress } from "./common";
 
 // Replace with the actual contract address

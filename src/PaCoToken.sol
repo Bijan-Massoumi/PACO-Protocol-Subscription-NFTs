@@ -5,11 +5,16 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./SubscriptionPoolTracker.sol";
-import "./IPaCoToken.sol";
+import "./IPacoToken.sol";
+import "./IPacoTokenErrors.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
-abstract contract PaCoToken is IPaCoToken, SubscriptionPoolTracker {
+abstract contract PacoToken is
+    IPacoToken,
+    SubscriptionPoolTracker,
+    IPacoTokenErrors
+{
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -27,23 +32,6 @@ abstract contract PaCoToken is IPaCoToken, SubscriptionPoolTracker {
     address withdrawAddress;
     //  If the token is being liquidated, the stated price will halve every halfLife period of time
     uint256 halfLife = 2 days;
-
-    /// ============ Errors ============
-
-    /// @notice Thrown if a user tries to claim an NFT they already own
-    error ClaimingOwnNFT();
-    /// @notice Thrown if sender is not approved or owner
-    error IsNotApprovedOrOwner();
-    /// @notice Thrown if sender is not owner
-    error IsNotOwner();
-    /// @notice Thrown if sender is setting an eschrow for an owned token
-    error SettingEschrowForOwnedToken();
-    /// @notice Thrown if token does not exist
-    error TokenDoesntExist();
-    /// @notice Thrown if zero address is passed
-    error IsZeroAddress();
-    /// @notice Thrown if approval is called on the current owner
-    error ApprovalToCurrentOwner();
 
     constructor(
         address _erc20Address,
@@ -255,7 +243,7 @@ abstract contract PaCoToken is IPaCoToken, SubscriptionPoolTracker {
     }
 
     /**
-     * @dev See {PaCo-approve}.
+     * @dev See {Paco-approve}.
      */
     function approve(address to, uint256 tokenId) public virtual override {
         address owner = ownerOf(tokenId);
@@ -270,7 +258,7 @@ abstract contract PaCoToken is IPaCoToken, SubscriptionPoolTracker {
     }
 
     /**
-     * @dev See {PaCo-getApproved}.
+     * @dev See {Paco-getApproved}.
      */
     function getApproved(uint256 tokenId)
         public
@@ -279,7 +267,7 @@ abstract contract PaCoToken is IPaCoToken, SubscriptionPoolTracker {
         override
         returns (address)
     {
-        require(_exists(tokenId), "PaCo: approved query for nonexistent token");
+        require(_exists(tokenId), "Paco: approved query for nonexistent token");
 
         return _tokenApprovals[tokenId];
     }
@@ -418,7 +406,7 @@ abstract contract PaCoToken is IPaCoToken, SubscriptionPoolTracker {
         uint256 subscriptionPoolAmount
     ) internal virtual {
         require(!_exists(tokenId), "Token already minted");
-        require(to != address(0), "PaCo: mint to the zero address");
+        require(to != address(0), "Paco: mint to the zero address");
 
         _beforeTokenTransfer(address(0), to, tokenId);
         _balances[to] += 1;
@@ -524,17 +512,17 @@ abstract contract PaCoToken is IPaCoToken, SubscriptionPoolTracker {
             currentOwnerAddress == from,
             "ERC721: transfer of token that is not own"
         );
-        require(to != address(0), "PaCo: transfer to the zero address");
+        require(to != address(0), "Paco: transfer to the zero address");
         require(
             _tokenIsAuthorizedForTransfer(tokenId),
-            "PaCo: token not authorized"
+            "Paco: token not authorized"
         );
 
         _beforeTokenTransfer(from, to, tokenId);
         // Check that tokenId was not transferred by `_beforeTokenTransfer` hook
         require(
             ownerOf(tokenId) == from,
-            "PaCo: transfer from incorrect owner"
+            "Paco: transfer from incorrect owner"
         );
         // Clear approvals from the previous owner
         delete _tokenApprovals[tokenId];

@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.18;
 
-import "./PaCoToken.sol";
-import "./SeaportPaCoToken.sol";
+import "./PacoToken.sol";
+import "./SeaportPacoToken.sol";
 
-contract PaCoSeaportExample is SeaportPaCoToken {
+contract PacoSeaportExample is SeaportPacoToken {
     uint256 public constant mintPrice = 1;
     uint256 public constant MAX_SUPPLY = 10000;
 
@@ -22,7 +22,7 @@ contract PaCoSeaportExample is SeaportPaCoToken {
         uint16 selfAssessmentRate,
         address seaportAddress
     )
-        SeaportPaCoToken(
+        SeaportPacoToken(
             tokenAddress,
             withdrawAddress,
             selfAssessmentRate,
