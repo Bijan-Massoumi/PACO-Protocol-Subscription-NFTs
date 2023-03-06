@@ -7,7 +7,7 @@ The owner pays a SAF (Self Assessment Fee) proportionate to the price they’ve 
 If they want to hold onto the NFT, the owner can set a higher price (incurring a higher fee). If they want to flip it, they can set the price closer to the floor and pay less.
 
 ### How is the SAF collected?
-The token owner posts a bond greater than or equal to a protocol-determined percentage of their self assessed price. Every block, a small amount of their bond drips out to pay their SAF. The percentage must be non-trivial to mitigate attack vectors explained later.
+The token owner posts a subscriptionPool greater than or equal to a protocol-determined percentage of their self assessed price. Every block, a small amount of their subscriptionPool drips out to pay their SAF. The percentage must be non-trivial to mitigate attack vectors explained later.
 
 ### Where do the collected protocol fees go?
 An address can be set at deployment. Whether this address is a multi-sig, a DAO or the creator’s personal wallet is at the discretion of the deployer.

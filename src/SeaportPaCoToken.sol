@@ -41,15 +41,15 @@ abstract contract SeaportPaCoToken is
         address _seaportAddress
     ) PaCoTokenEnumerable(tokenAddress, withdrawAddress, selfAssessmentRate) {
         seaportAddress = _seaportAddress;
-        bondToken.approve(seaportAddress, 2**256 - 1);
+        subscriptionPoolToken.approve(seaportAddress, 2**256 - 1);
     }
 
-    // todo add bond refund to order. add to fufill order?
+    // todo add subscriptionPool refund to order. add to fufill order?
     function fulfillOrder(
         OfferItem[] calldata offer, // 0x40
         ConsiderationItem[] calldata consideration, // 0x60
         uint256[] calldata newStatedPrices,
-        uint256[] calldata newBondAmounts
+        uint256[] calldata newSubscriptionPoolAmounts
     ) external payable nonReentrant returns (bool fulfilled) {
         // validate consideration and offer
         uint256[] memory offerTokenIds;
@@ -70,12 +70,16 @@ abstract contract SeaportPaCoToken is
             amountDueOwnersSize
         );
 
-        // collect payment from msg.sender for purchased token bonds + tip payments
+        // collect payment from msg.sender for purchased token subscriptionPools + tip payments
         senderFunds += totalTips;
-        for (uint256 i = 0; i < newBondAmounts.length; i++) {
-            senderFunds += newBondAmounts[i];
+        for (uint256 i = 0; i < newSubscriptionPoolAmounts.length; i++) {
+            senderFunds += newSubscriptionPoolAmounts[i];
         }
-        bondToken.safeTransferFrom(msg.sender, address(this), senderFunds);
+        subscriptionPoolToken.safeTransferFrom(
+            msg.sender,
+            address(this),
+            senderFunds
+        );
 
         // fulfill order and swap assets
         for (uint256 i = 0; i < offerTokenIdsSize; i++) {
@@ -86,16 +90,16 @@ abstract contract SeaportPaCoToken is
             _addRefundsToConsideration(consideration, amountDueToTokenOwners)
         );
 
-        // update bondInfo for each token transferred
-        uint256 totalbond = 0;
+        // update subscriptionPoolInfo for each token transferred
+        uint256 totalsubscriptionPool = 0;
         for (uint256 i = 0; i < offerTokenIdsSize; i++) {
-            totalbond += newBondAmounts[i];
-            // reverts if bond too little
-            _postBond(
+            totalsubscriptionPool += newSubscriptionPoolAmounts[i];
+            // reverts if subscriptionPool too little
+            _postSubscriptionPool(
                 msg.sender,
                 offerTokenIds[i],
                 newStatedPrices[i],
-                newBondAmounts[i]
+                newSubscriptionPoolAmounts[i]
             );
             authorizedForTransfer[offerTokenIds[i]] = false;
         }
@@ -167,9 +171,9 @@ abstract contract SeaportPaCoToken is
             if (owner == msg.sender) revert FufillerSameAsTokenOwner();
 
             uint256 price;
-            uint256 bond;
+            uint256 subscriptionPool;
             uint256 fees;
-            (price, bond, fees) = _getPriceBondFees(
+            (price, subscriptionPool, fees) = _getPriceSubscriptionPoolFees(
                 offerItem.identifierOrCriteria
             );
             offerTokenIds[offerTokenIdsSize++] = offerItem.identifierOrCriteria;
@@ -178,7 +182,7 @@ abstract contract SeaportPaCoToken is
             bool found = false;
             for (uint256 j = 0; j < amountDueToTokenOwners.length; j++) {
                 if (amountDueToTokenOwners[j].owner == owner) {
-                    amountDueToTokenOwners[j].refund += bond;
+                    amountDueToTokenOwners[j].refund += subscriptionPool;
                     amountDueToTokenOwners[j].owed += price;
                     found = true;
                     break;
@@ -187,7 +191,7 @@ abstract contract SeaportPaCoToken is
             if (!found) {
                 amountDueToTokenOwners[ooaSize++] = OwnerOwnedAmount(
                     owner,
-                    bond,
+                    subscriptionPool,
                     price,
                     0
                 );
@@ -205,7 +209,7 @@ abstract contract SeaportPaCoToken is
         );
     }
 
-    // TODO allow for tip payment in bondToken
+    // TODO allow for tip payment in subscriptionPoolToken
     function _verifyConsideration(
         ConsiderationItem[] memory consideration,
         OwnerOwnedAmount[] memory amountDueToTokenOwners,
@@ -217,8 +221,8 @@ abstract contract SeaportPaCoToken is
             ConsiderationItem memory considerationItem = consideration[i];
             if (considerationItem.startAmount != considerationItem.endAmount)
                 revert NonStaticAmount();
-            if (considerationItem.token != address(bondToken))
-                revert NonBondToken();
+            if (considerationItem.token != address(subscriptionPoolToken))
+                revert NonSubscriptionPoolToken();
 
             // check if payment is to offer token owner or a tip to an unknown address
             bool sendingToKnownAddr = false;
@@ -267,7 +271,7 @@ abstract contract SeaportPaCoToken is
         for (uint256 i = 0; i < refunds.length; i++) {
             result[index] = ConsiderationItem(
                 ItemType.ERC20,
-                address(bondToken),
+                address(subscriptionPoolToken),
                 0,
                 refunds[i].refund,
                 refunds[i].refund,

@@ -5,7 +5,7 @@ pragma solidity 0.8.18;
 import "./PaCoToken.sol";
 import "./SeaportPaCoToken.sol";
 
-contract PaCoSeaportExample is SeaportPaCoToken, ReentrancyGuard {
+contract PaCoSeaportExample is SeaportPaCoToken {
     uint256 public constant mintPrice = 1;
     uint256 public constant MAX_SUPPLY = 10000;
 
@@ -36,14 +36,14 @@ contract PaCoSeaportExample is SeaportPaCoToken, ReentrancyGuard {
     function mint(
         uint256 numberOfTokens,
         uint256 price,
-        uint256 bond
+        uint256 subscriptionPool
     ) external {
         require(
             totalSupply() + numberOfTokens <= MAX_SUPPLY,
             "Purchase would exceed max supply"
         );
         uint256 mintIndex = totalSupply();
-        _mint(mintIndex, numberOfTokens, msg.sender, price, bond);
+        _mint(mintIndex, numberOfTokens, msg.sender, price, subscriptionPool);
     }
 
     function _mint(
@@ -51,10 +51,10 @@ contract PaCoSeaportExample is SeaportPaCoToken, ReentrancyGuard {
         uint256 numberOfTokens,
         address sender,
         uint256 price,
-        uint256 bond
+        uint256 subscriptionPool
     ) private {
         for (uint256 i = start; i < start + numberOfTokens; i++) {
-            _mint(sender, i, price, bond);
+            _mint(sender, i, price, subscriptionPool);
         }
     }
 }

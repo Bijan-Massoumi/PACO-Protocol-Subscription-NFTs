@@ -32,24 +32,24 @@ contract PaCoExample is PaCoTokenEnumerable, ReentrancyGuard {
     function mint(
         uint256 numberOfTokens,
         uint256 price,
-        uint256 bond
+        uint256 subscriptionPool
     ) external {
         require(
             totalSupply() + numberOfTokens <= MAX_SUPPLY,
             "Purchase would exceed max supply"
         );
         uint256 mintIndex = totalSupply();
-        _mint(numberOfTokens, msg.sender, mintIndex, price, bond);
+        _mint(numberOfTokens, msg.sender, mintIndex, price, subscriptionPool);
     }
 
     function buyToken(
         uint256 tokenId,
         uint256 newPrice,
-        uint256 bondAmount
+        uint256 subscriptionPoolAmount
     ) external override nonReentrant {
         if (ownerOf(tokenId) == msg.sender) revert ClaimingOwnNFT();
         authorizedForTransfer[tokenId] = true;
-        _buyToken(tokenId, newPrice, bondAmount);
+        _buyToken(tokenId, newPrice, subscriptionPoolAmount);
         authorizedForTransfer[tokenId] = false;
     }
 
@@ -58,10 +58,10 @@ contract PaCoExample is PaCoTokenEnumerable, ReentrancyGuard {
         address sender,
         uint256 tokenId,
         uint256 price,
-        uint256 bond
+        uint256 subscriptionPool
     ) private {
         for (uint256 i = 0; i < numberOfTokens; i++) {
-            _mint(sender, tokenId, price, bond);
+            _mint(sender, tokenId, price, subscriptionPool);
         }
     }
 

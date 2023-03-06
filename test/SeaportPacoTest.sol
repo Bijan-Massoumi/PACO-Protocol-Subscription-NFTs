@@ -13,9 +13,9 @@ import {ISeaportErrors} from "../src/ISeaportErrors.sol";
 contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
     uint256 whaleTokenId;
     uint256 ownerTokenId;
-    uint256 minBond = 1000;
+    uint256 minSubscriptionPool = 1000;
     uint256[] multiPrices;
-    uint256[] multiBonds;
+    uint256[] multiSubscriptionPools;
     uint256 prevContractBalance;
 
     ConsiderationItem emptyItem =
@@ -33,10 +33,10 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
     function setUp() public override {
         super.setUp();
         uint256 statedPrice = oneETH * 100;
-        uint256 bond = oneETH * 100;
+        uint256 subscriptionPool = oneETH * 100;
 
         vm.prank(tokenWhale);
-        paco.mint(1, statedPrice, bond);
+        paco.mint(1, statedPrice, subscriptionPool);
         uint256[] memory whaleTokens = paco.getTokenIdsForAddress(tokenWhale);
         whaleTokenId = whaleTokens[0];
 
@@ -53,9 +53,9 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         for (uint256 i = 0; i < multiPrices.length; i++) {
             uint256 newPrice = multiPrices[i];
-            multiBonds.push(((newPrice * minBond) / 10000) + 1);
+            multiSubscriptionPools.push(((newPrice * minSubscriptionPool) / 10000) + 1);
         }
-        prevContractBalance = bondToken.balanceOf(address(paco));
+        prevContractBalance = subscriptionPoolToken.balanceOf(address(paco));
     }
 
     function testBasicSeaportTx() public {
@@ -78,24 +78,24 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
         prices[0] = newPrice;
 
         uint256 cost = consideration[0].endAmount;
-        uint256 beforeBalance = bondToken.balanceOf(tokenWhale);
-        uint256 remainingBond = paco.getBond(whaleTokenId);
+        uint256 beforeBalance = subscriptionPoolToken.balanceOf(tokenWhale);
+        uint256 remainingSubscriptionPool = paco.getSubscriptionPool(whaleTokenId);
 
-        uint256 newBond = ((newPrice * minBond) / 10000) + 1;
-        uint256[] memory bonds = new uint256[](1);
-        bonds[0] = newBond;
+        uint256 newSubscriptionPool = ((newPrice * minSubscriptionPool) / 10000) + 1;
+        uint256[] memory subscriptionPools = new uint256[](1);
+        subscriptionPools[0] = newSubscriptionPool;
         vm.prank(owner);
-        paco.fulfillOrder(offer, consideration, prices, bonds);
+        paco.fulfillOrder(offer, consideration, prices, subscriptionPools);
 
         assertEq(paco.ownerOf(whaleTokenId), owner);
         assertEq(
-            bondToken.balanceOf(tokenWhale),
-            beforeBalance + cost + remainingBond
+            subscriptionPoolToken.balanceOf(tokenWhale),
+            beforeBalance + cost + remainingSubscriptionPool
         );
         assertEq(paco.getPrice(whaleTokenId), newPrice);
         assertEq(
-            bondToken.balanceOf(address(paco)),
-            prevContractBalance + newBond - remainingBond
+            subscriptionPoolToken.balanceOf(address(paco)),
+            prevContractBalance + newSubscriptionPool - remainingSubscriptionPool
         );
     }
 
@@ -117,32 +117,32 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         OwnerBalance[] memory prevBalances = getOwnerWithPrevBalances(tokenIds);
         vm.prank(tokenWhale);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiBonds);
+        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
         assertEq(paco.ownerOf(0), tokenWhale);
         assertEq(paco.ownerOf(4), tokenWhale);
         assertEq(paco.ownerOf(7), tokenWhale);
 
         uint256 totalRefund = 0;
-        uint256 totalNewBond = 0;
-        for (uint256 i = 0; i < multiBonds.length; i++) {
-            totalNewBond += multiBonds[i];
+        uint256 totalNewSubscriptionPool = 0;
+        for (uint256 i = 0; i < multiSubscriptionPools.length; i++) {
+            totalNewSubscriptionPool += multiSubscriptionPools[i];
         }
         OwnerBalance[] memory newBalances = getOwnerWithPrevBalances(tokenIds);
         for (uint256 i = 0; i < prevBalances.length; i++) {
             OwnerBalance memory prevBalance = prevBalances[i];
             OwnerBalance memory newBalance = newBalances[i];
-            totalRefund += prevBalance.ownerBondRemaining;
+            totalRefund += prevBalance.ownerSubscriptionPoolRemaining;
             assertEq(
                 newBalance.ownerBalance,
                 prevBalance.ownerBalance +
                     consideration[i].endAmount +
-                    prevBalance.ownerBondRemaining
+                    prevBalance.ownerSubscriptionPoolRemaining
             );
         }
 
         assertEq(
-            bondToken.balanceOf(address(paco)),
-            prevContractBalance + totalNewBond - totalRefund
+            subscriptionPoolToken.balanceOf(address(paco)),
+            prevContractBalance + totalNewSubscriptionPool - totalRefund
         );
     }
 
@@ -178,33 +178,33 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         OwnerBalance[] memory prevBalances = getOwnerWithPrevBalances(tokenIds);
         vm.prank(tokenWhale);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiBonds);
+        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
 
         assertEq(paco.ownerOf(0), tokenWhale);
         assertEq(paco.ownerOf(4), tokenWhale);
         assertEq(paco.ownerOf(7), tokenWhale);
 
         uint256 totalRefund = 0;
-        uint256 totalNewBond = 0;
-        for (uint256 i = 0; i < multiBonds.length; i++) {
-            totalNewBond += multiBonds[i];
+        uint256 totalNewSubscriptionPool = 0;
+        for (uint256 i = 0; i < multiSubscriptionPools.length; i++) {
+            totalNewSubscriptionPool += multiSubscriptionPools[i];
         }
         OwnerBalance[] memory newBalances = getOwnerWithPrevBalances(tokenIds);
         for (uint256 i = 0; i < prevBalances.length; i++) {
             OwnerBalance memory prevBalance = prevBalances[i];
             OwnerBalance memory newBalance = newBalances[i];
-            totalRefund += prevBalance.ownerBondRemaining;
+            totalRefund += prevBalance.ownerSubscriptionPoolRemaining;
             assertEq(
                 newBalance.ownerBalance,
                 prevBalance.ownerBalance +
                     paco.getPrice(consideration[i].identifierOrCriteria) +
-                    prevBalance.ownerBondRemaining
+                    prevBalance.ownerSubscriptionPoolRemaining
             );
         }
 
         assertEq(
-            bondToken.balanceOf(address(paco)),
-            prevContractBalance + totalNewBond - totalRefund
+            subscriptionPoolToken.balanceOf(address(paco)),
+            prevContractBalance + totalNewSubscriptionPool - totalRefund
         );
     }
 
@@ -227,7 +227,7 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         vm.prank(tokenWhale);
         vm.expectRevert(NonPacoToken.selector);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiBonds);
+        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
 
         offer = createOfferForTokenIds(tokenIds, emptyOfferItem);
         (consideration, size) = createConsiderationForTokenIds(
@@ -243,8 +243,8 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
         );
 
         vm.prank(tokenWhale);
-        vm.expectRevert(NonBondToken.selector);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiBonds);
+        vm.expectRevert(NonSubscriptionPoolToken.selector);
+        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
     }
 
     function testRevertInsufficientOwnerPayment() public {
@@ -271,6 +271,6 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         vm.prank(tokenWhale);
         vm.expectRevert(InsufficientOwnerPayment.selector);
-        paco.fulfillOrder(offer, consideration, multiPrices, multiBonds);
+        paco.fulfillOrder(offer, consideration, multiPrices, multiSubscriptionPools);
     }
 }

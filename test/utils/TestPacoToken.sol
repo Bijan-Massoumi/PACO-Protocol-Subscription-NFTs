@@ -10,7 +10,7 @@ import {AdvancedOrder, OrderParameters} from "../../src/SeaportStructs.sol";
 
 abstract contract TestPacoToken is Test {
     PaCoExample paco;
-    TestToken bondToken;
+    TestToken subscriptionPoolToken;
     uint256 oneETH = 10**18;
 
     address withdrawAddr = address(1137);
@@ -25,31 +25,35 @@ abstract contract TestPacoToken is Test {
     function setUp() public virtual {
         // launch contracts
         vm.warp(startBlockTimestamp);
-        bondToken = new TestToken("TestToken", "TT");
+        subscriptionPoolToken = new TestToken("TestToken", "TT");
         vm.prank(tokenWhale);
-        bondToken.mint(oneETH * 1000000000);
+        subscriptionPoolToken.mint(oneETH * 1000000000);
         vm.startPrank(owner);
-        paco = new PaCoExample(address(bondToken), withdrawAddr, feeRate);
+        paco = new PaCoExample(
+            address(subscriptionPoolToken),
+            withdrawAddr,
+            feeRate
+        );
         vm.stopPrank();
 
-        // approve PaCo allowance for bond token
+        // approve PaCo allowance for subscriptionPool token
         vm.prank(tokenWhale);
-        bondToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
         vm.prank(owner);
-        bondToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
         vm.prank(addr2);
-        bondToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
 
         // fund wallets
         vm.startPrank(tokenWhale);
-        bondToken.transfer(owner, oneETH * 500);
-        bondToken.transfer(addr2, oneETH * 500);
+        subscriptionPoolToken.transfer(owner, oneETH * 500);
+        subscriptionPoolToken.transfer(addr2, oneETH * 500);
         vm.stopPrank();
     }
 
     function approveNewAddress(address addr) public {
         vm.startPrank(addr);
-        bondToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
         vm.stopPrank();
     }
 }

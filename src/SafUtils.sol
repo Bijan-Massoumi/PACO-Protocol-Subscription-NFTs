@@ -19,10 +19,10 @@ library SafUtils {
         uint256 totalStatedPrice,
         uint256 lastCheckInAt,
         uint256 feeRate,
-        uint256 bondRemaining
+        uint256 subscriptionPoolRemaining
     ) internal pure returns (uint256 liquidationStartedAt) {
         liquidationStartedAt =
-            (bondRemaining * (secondsInYear * 10000)) /
+            (subscriptionPoolRemaining * (secondsInYear * 10000)) /
             (feeRate * totalStatedPrice) +
             lastCheckInAt;
     }

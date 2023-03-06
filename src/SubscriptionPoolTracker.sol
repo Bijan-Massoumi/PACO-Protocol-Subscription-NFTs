@@ -4,9 +4,9 @@ pragma solidity 0.8.18;
 import "./SafUtils.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-struct BondInfo {
+struct SubscriptionPoolInfo {
     uint256 statedPrice;
-    uint256 bondRemaining;
+    uint256 subscriptionPoolRemaining;
     uint256 lastModifiedAt;
     uint256 liquidationStartedAt;
 }
@@ -16,13 +16,14 @@ struct FeeChangeTimestamp {
     uint256 previousRate;
 }
 
-abstract contract BondTracker is Ownable {
-    mapping(uint256 => BondInfo) internal _bondInfosAtLastCheckpoint;
+abstract contract SubscriptionPoolTracker is Ownable {
+    mapping(uint256 => SubscriptionPoolInfo)
+        internal _subscriptionPoolInfosAtLastCheckpoint;
     FeeChangeTimestamp[] feeChangeTimestamps;
 
     // min percentage (10%) of total stated price that
-    // must be convered by bond
-    uint256 internal minimumBond = 1000;
+    // must be convered by subscriptionPool
+    uint256 internal minimumSubscriptionPool = 1000;
     //set by constructor
     uint256 internal selfAssessmentRate;
     // 100% fee rate
@@ -31,10 +32,10 @@ abstract contract BondTracker is Ownable {
     /// ============ Errors ============
     /// @notice Thrown if invalid price values
     error InvalidAlterPriceValue();
-    /// @notice Thrown if invalid bond values
-    error InvalidAlterBondValue();
-    /// @notice Thrown if bond isnt enough to cover miminum bond
-    error InsufficientBond();
+    /// @notice Thrown if invalid subscriptionPool values
+    error InvalidAlterSubscriptionPoolValue();
+    /// @notice Thrown if subscriptionPool isnt enough to cover miminum subscriptionPool
+    error InsufficientSubscriptionPool();
     error InvalidAssessmentFee();
 
     constructor(uint256 _selfAssessmentRate) {
@@ -47,9 +48,12 @@ abstract contract BondTracker is Ownable {
         returns (uint256)
     {
         uint256 liquidationStartedAt;
-        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
-        (, , liquidationStartedAt) = _getCurrentBondInfoForToken(
-            currentOwnersBond
+        SubscriptionPoolInfo
+            memory currentOwnersSubscriptionPool = _subscriptionPoolInfosAtLastCheckpoint[
+                tokenId
+            ];
+        (, , liquidationStartedAt) = _getCurrentSubscriptionPoolInfoForToken(
+            currentOwnersSubscriptionPool
         );
         return liquidationStartedAt;
     }
@@ -71,11 +75,16 @@ abstract contract BondTracker is Ownable {
         selfAssessmentRate = newSelfAssessmentRate;
     }
 
-    function setMinimumBond(uint256 newMinimumBond) external onlyOwner {
-        minimumBond = newMinimumBond;
+    function setMinimumSubscriptionPool(uint256 newMinimumSubscriptionPool)
+        external
+        onlyOwner
+    {
+        minimumSubscriptionPool = newMinimumSubscriptionPool;
     }
 
-    function _getCurrentBondInfoForToken(BondInfo memory lastBondInfo)
+    function _getCurrentSubscriptionPoolInfoForToken(
+        SubscriptionPoolInfo memory lastSubscriptionPoolInfo
+    )
         internal
         view
         returns (
@@ -86,47 +95,47 @@ abstract contract BondTracker is Ownable {
     {
         // either they have no tokens or they are being liquidated
         if (
-            lastBondInfo.bondRemaining == 0 ||
-            lastBondInfo.liquidationStartedAt != 0
+            lastSubscriptionPoolInfo.subscriptionPoolRemaining == 0 ||
+            lastSubscriptionPoolInfo.liquidationStartedAt != 0
         ) {
-            return (0, 0, lastBondInfo.liquidationStartedAt);
+            return (0, 0, lastSubscriptionPoolInfo.liquidationStartedAt);
         }
 
         uint256 feesToReap;
         uint256 liquidationStartedAt;
         (feesToReap, liquidationStartedAt) = _calculateFeesAndLiquidationTime(
-            lastBondInfo.statedPrice,
-            lastBondInfo.lastModifiedAt,
-            lastBondInfo.bondRemaining
+            lastSubscriptionPoolInfo.statedPrice,
+            lastSubscriptionPoolInfo.lastModifiedAt,
+            lastSubscriptionPoolInfo.subscriptionPoolRemaining
         );
 
-        if (feesToReap > lastBondInfo.bondRemaining) {
+        if (feesToReap > lastSubscriptionPoolInfo.subscriptionPoolRemaining) {
             return (
                 0,
-                feesToReap - lastBondInfo.bondRemaining,
+                feesToReap - lastSubscriptionPoolInfo.subscriptionPoolRemaining,
                 liquidationStartedAt
             );
         }
         return (
-            lastBondInfo.bondRemaining - feesToReap,
+            lastSubscriptionPoolInfo.subscriptionPoolRemaining - feesToReap,
             feesToReap,
-            lastBondInfo.liquidationStartedAt
+            lastSubscriptionPoolInfo.liquidationStartedAt
         );
     }
 
     /*
      * @notice Calculates the fees that have accrued since the last checkpoint
-     * and the time at which the bond ran out (i.e. liquidation began)
-     * @param statedPrice The price at which the bond was last modified
-     * @param lastModifiedAt The time at which the bond/statedPrice was last modified
-     * @param bondRemaining The amount of bond remaining
+     * and the time at which the subscriptionPool ran out (i.e. liquidation began)
+     * @param statedPrice The price at which the subscriptionPool was last modified
+     * @param lastModifiedAt The time at which the subscriptionPool/statedPrice was last modified
+     * @param subscriptionPoolRemaining The amount of subscriptionPool remaining
      * @return totalFee The total fees that have accrued since the last checkpoint
-     * @return liquidationTime The time at which the bond hit 0
+     * @return liquidationTime The time at which the subscriptionPool hit 0
      */
     function _calculateFeesAndLiquidationTime(
         uint256 statedPrice,
         uint256 lastModifiedAt,
-        uint256 bondRemaining
+        uint256 subscriptionPoolRemaining
     ) internal view returns (uint256, uint256) {
         uint256 totalFee;
         uint256 prevIntervalFee;
@@ -144,13 +153,13 @@ abstract contract BondTracker is Ownable {
                     previousRate
                 );
                 totalFee += intervalFee;
-                // if the total fee is greater than the bond remaining, we know that the bond ran out
-                if (totalFee > bondRemaining) {
+                // if the total fee is greater than the subscriptionPool remaining, we know that the subscriptionPool ran out
+                if (totalFee > subscriptionPoolRemaining) {
                     liquidationTime = SafUtils._getTimeLiquidationBegan(
                         statedPrice,
                         startTime,
                         previousRate,
-                        bondRemaining - prevIntervalFee
+                        subscriptionPoolRemaining - prevIntervalFee
                     );
                     return (totalFee, liquidationTime);
                 }
@@ -166,56 +175,63 @@ abstract contract BondTracker is Ownable {
             block.timestamp,
             selfAssessmentRate
         );
-        if (totalFee > bondRemaining) {
+        if (totalFee > subscriptionPoolRemaining) {
             liquidationTime = SafUtils._getTimeLiquidationBegan(
                 statedPrice,
                 startTime,
                 selfAssessmentRate,
-                bondRemaining - prevIntervalFee
+                subscriptionPoolRemaining - prevIntervalFee
             );
         }
 
         return (totalFee, liquidationTime);
     }
 
-    function _modifyBondInfo(
-        BondInfo storage _bondInfoAtLastCheckpoint,
-        int256 bondDelta,
+    function _modifySubscriptionPoolInfo(
+        SubscriptionPoolInfo storage _subscriptionPoolInfoAtLastCheckpoint,
+        int256 subscriptionPoolDelta,
         int256 statedPriceDelta
     ) internal returns (uint256 feesToReap) {
-        uint256 bondRemaining;
+        uint256 subscriptionPoolRemaining;
         uint256 liquidationStartedAt;
         (
-            bondRemaining,
+            subscriptionPoolRemaining,
             feesToReap,
             liquidationStartedAt
-        ) = _getCurrentBondInfoForToken(_bondInfoAtLastCheckpoint);
+        ) = _getCurrentSubscriptionPoolInfoForToken(
+            _subscriptionPoolInfoAtLastCheckpoint
+        );
 
-        int256 newBond = int256(bondRemaining) + bondDelta;
-        int256 newStatedPrice = int256(_bondInfoAtLastCheckpoint.statedPrice) +
-            statedPriceDelta;
+        int256 newSubscriptionPool = int256(subscriptionPoolRemaining) +
+            subscriptionPoolDelta;
+        int256 newStatedPrice = int256(
+            _subscriptionPoolInfoAtLastCheckpoint.statedPrice
+        ) + statedPriceDelta;
 
         if (newStatedPrice < 0) revert InvalidAlterPriceValue();
-        if (newBond < 0) revert InvalidAlterBondValue();
+        if (newSubscriptionPool < 0) revert InvalidAlterSubscriptionPoolValue();
 
-        _persistNewBondInfo(
-            _bondInfoAtLastCheckpoint,
+        _persistNewSubscriptionPoolInfo(
+            _subscriptionPoolInfoAtLastCheckpoint,
             uint256(newStatedPrice),
-            uint256(newBond)
+            uint256(newSubscriptionPool)
         );
     }
 
-    function _persistNewBondInfo(
-        BondInfo storage bondInfoRef,
+    function _persistNewSubscriptionPoolInfo(
+        SubscriptionPoolInfo storage subscriptionPoolInfoRef,
         uint256 newStatedPrice,
-        uint256 newBondAmount
+        uint256 newSubscriptionPoolAmount
     ) internal {
-        if (newBondAmount < (newStatedPrice * minimumBond) / 10000)
-            revert InsufficientBond();
+        if (
+            newSubscriptionPoolAmount <
+            (newStatedPrice * minimumSubscriptionPool) / 10000
+        ) revert InsufficientSubscriptionPool();
 
-        bondInfoRef.statedPrice = newStatedPrice;
-        bondInfoRef.bondRemaining = newBondAmount;
-        bondInfoRef.lastModifiedAt = block.timestamp;
-        bondInfoRef.liquidationStartedAt = 0;
+        subscriptionPoolInfoRef.statedPrice = newStatedPrice;
+        subscriptionPoolInfoRef
+            .subscriptionPoolRemaining = newSubscriptionPoolAmount;
+        subscriptionPoolInfoRef.lastModifiedAt = block.timestamp;
+        subscriptionPoolInfoRef.liquidationStartedAt = 0;
     }
 }

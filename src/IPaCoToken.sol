@@ -6,11 +6,11 @@ pragma solidity 0.8.18;
 interface IPaCoToken {
     event Transfer(address from, address to, uint256 _tokenId);
 
-    event NewPriceBondSet(
+    event NewPriceSubscriptionPoolSet(
         address owner,
         uint256 tokenId,
         uint256 price,
-        uint256 bond
+        uint256 subscriptionPool
     );
 
     event Approval(
@@ -23,7 +23,7 @@ interface IPaCoToken {
 
     function ownerOf(uint256 tokenId) external view returns (address owner);
 
-    function getBond(uint256 _tokenId) external view returns (uint256);
+    function getSubscriptionPool(uint256 _tokenId) external view returns (uint256);
 
     function getPrice(uint256 _tokenId) external view returns (uint256);
 
@@ -58,18 +58,18 @@ interface IPaCoToken {
     function buyToken(
         uint256 tokenId,
         uint256 newPrice,
-        uint256 bondAmount
+        uint256 subscriptionPoolAmount
     ) external;
 
-    function alterStatedPriceAndBond(
+    function alterStatedPriceAndSubscriptionPool(
         uint256 _tokenId,
         int256 priceDelta,
-        int256 bondDelta
+        int256 subscriptionPoolDelta
     ) external;
 
-    function increaseBond(uint256 tokenId, uint256 amount) external;
+    function increaseSubscriptionPool(uint256 tokenId, uint256 amount) external;
 
-    function decreaseBond(uint256 tokenId, uint256 amount) external;
+    function decreaseSubscriptionPool(uint256 tokenId, uint256 amount) external;
 
     function increaseStatedPrice(uint256 tokenId, uint256 amount) external;
 

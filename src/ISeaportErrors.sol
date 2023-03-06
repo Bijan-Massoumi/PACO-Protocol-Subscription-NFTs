@@ -5,11 +5,11 @@ pragma solidity 0.8.18;
 interface ISeaportErrors {
     error SeaportSwapFailed();
     error NonPacoToken();
-    error NonBondToken();
+    error NonSubscriptionPoolToken();
     error FufillerSameAsTokenOwner();
     error NonStaticAmount();
     error InsufficientOwnerPayment();
     error InsufficientZonePayment();
-    error NonExactBondAmount();
+    error NonExactSubscriptionPoolAmount();
     error InvalidOwner();
 }

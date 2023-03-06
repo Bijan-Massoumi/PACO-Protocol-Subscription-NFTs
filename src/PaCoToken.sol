@@ -4,12 +4,12 @@ pragma solidity 0.8.18;
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./BondTracker.sol";
+import "./SubscriptionPoolTracker.sol";
 import "./IPaCoToken.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 
-abstract contract PaCoToken is IPaCoToken, BondTracker {
+abstract contract PaCoToken is IPaCoToken, SubscriptionPoolTracker {
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -23,7 +23,7 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
     mapping(uint256 => address) private _tokenApprovals;
 
     uint256 creatorFees;
-    IERC20 bondToken;
+    IERC20 subscriptionPoolToken;
     address withdrawAddress;
     //  If the token is being liquidated, the stated price will halve every halfLife period of time
     uint256 halfLife = 2 days;
@@ -49,8 +49,8 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         address _erc20Address,
         address _withdrawAddress,
         uint16 _selfAssessmentRate
-    ) Ownable() BondTracker(_selfAssessmentRate) {
-        bondToken = IERC20(_erc20Address);
+    ) Ownable() SubscriptionPoolTracker(_selfAssessmentRate) {
+        subscriptionPoolToken = IERC20(_erc20Address);
         withdrawAddress = _withdrawAddress;
     }
 
@@ -59,35 +59,45 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
     function buyToken(
         uint256 tokenId,
         uint256 newPrice,
-        uint256 bondAmount
+        uint256 subscriptionPoolAmount
     ) external virtual override {
         if (ownerOf(tokenId) == _msgSender()) revert ClaimingOwnNFT();
-        _buyToken(tokenId, newPrice, bondAmount);
+        _buyToken(tokenId, newPrice, subscriptionPoolAmount);
     }
 
-    function alterStatedPriceAndBond(
+    function alterStatedPriceAndSubscriptionPool(
         uint256 tokenId,
         int256 priceDelta,
-        int256 bondDelta
+        int256 subscriptionPoolDelta
     ) external override {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
-        _alterStatedPriceAndBond(tokenId, bondDelta, priceDelta);
+        _alterStatedPriceAndSubscriptionPool(
+            tokenId,
+            subscriptionPoolDelta,
+            priceDelta
+        );
     }
 
-    function increaseBond(uint256 tokenId, uint256 amount) external override {
+    function increaseSubscriptionPool(uint256 tokenId, uint256 amount)
+        external
+        override
+    {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
-        _alterStatedPriceAndBond(tokenId, int256(amount), 0);
+        _alterStatedPriceAndSubscriptionPool(tokenId, int256(amount), 0);
     }
 
-    function decreaseBond(uint256 tokenId, uint256 amount) external override {
+    function decreaseSubscriptionPool(uint256 tokenId, uint256 amount)
+        external
+        override
+    {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
-        _alterStatedPriceAndBond(tokenId, -int256(amount), 0);
+        _alterStatedPriceAndSubscriptionPool(tokenId, -int256(amount), 0);
     }
 
     function increaseStatedPrice(uint256 tokenId, uint256 amount)
@@ -97,7 +107,7 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
-        _alterStatedPriceAndBond(tokenId, 0, int256(amount));
+        _alterStatedPriceAndSubscriptionPool(tokenId, 0, int256(amount));
     }
 
     function decreaseStatedPrice(uint256 tokenId, uint256 amount)
@@ -107,7 +117,7 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
-        _alterStatedPriceAndBond(tokenId, 0, -int256(amount));
+        _alterStatedPriceAndSubscriptionPool(tokenId, 0, -int256(amount));
     }
 
     function reapAndWithdrawFees(uint256[] calldata tokenIds) external {
@@ -115,14 +125,23 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         withdrawAccumulatedFees();
     }
 
-    function getBond(uint256 tokenId) external view override returns (uint256) {
+    function getSubscriptionPool(uint256 tokenId)
+        external
+        view
+        override
+        returns (uint256)
+    {
         if (!_exists(tokenId)) revert TokenDoesntExist();
-        uint256 bondRemaining;
-        (bondRemaining, , ) = _getCurrentBondInfoForToken(
-            _bondInfosAtLastCheckpoint[tokenId]
+        uint256 subscriptionPoolRemaining;
+        (
+            subscriptionPoolRemaining,
+            ,
+
+        ) = _getCurrentSubscriptionPoolInfoForToken(
+            _subscriptionPoolInfosAtLastCheckpoint[tokenId]
         );
 
-        return bondRemaining;
+        return subscriptionPoolRemaining;
     }
 
     function burnToken(uint256 tokenId) external {
@@ -144,17 +163,22 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         if (!_exists(tokenId)) revert TokenDoesntExist();
 
         uint256 liquidationStartedAt;
-        BondInfo memory bondInfo = _bondInfosAtLastCheckpoint[tokenId];
-        (, , liquidationStartedAt) = _getCurrentBondInfoForToken(bondInfo);
+        SubscriptionPoolInfo
+            memory subscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+                tokenId
+            ];
+        (, , liquidationStartedAt) = _getCurrentSubscriptionPoolInfoForToken(
+            subscriptionPoolInfo
+        );
         if (liquidationStartedAt != 0) {
             return
                 SafUtils.getLiquidationPrice(
-                    bondInfo.statedPrice,
+                    subscriptionPoolInfo.statedPrice,
                     block.timestamp - liquidationStartedAt,
                     halfLife
                 );
         } else {
-            return bondInfo.statedPrice;
+            return subscriptionPoolInfo.statedPrice;
         }
     }
 
@@ -164,7 +188,7 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         override
         returns (uint256)
     {
-        return _bondInfosAtLastCheckpoint[_tokenId].statedPrice;
+        return _subscriptionPoolInfosAtLastCheckpoint[_tokenId].statedPrice;
     }
 
     // Public functions ------------------------------------------------------
@@ -177,29 +201,34 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
     function reapSafForTokenIds(uint256[] calldata tokenIds) public {
         uint256 netFees = 0;
         uint256 feesToReap;
-        uint256 bondRemaining;
+        uint256 subscriptionPoolRemaining;
         uint256 liquidationStartedAt;
         for (uint256 i = 0; i < tokenIds.length; i++) {
             if (!_exists(tokenIds[i])) revert TokenDoesntExist();
 
-            BondInfo storage currBondInfo = _bondInfosAtLastCheckpoint[
-                tokenIds[i]
-            ];
+            SubscriptionPoolInfo
+                storage currSubscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+                    tokenIds[i]
+                ];
             (
-                bondRemaining,
+                subscriptionPoolRemaining,
                 feesToReap,
                 liquidationStartedAt
-            ) = _getCurrentBondInfoForToken(currBondInfo);
-            currBondInfo.bondRemaining = bondRemaining;
-            currBondInfo.lastModifiedAt = block.timestamp;
-            currBondInfo.liquidationStartedAt = liquidationStartedAt;
+            ) = _getCurrentSubscriptionPoolInfoForToken(
+                currSubscriptionPoolInfo
+            );
+            currSubscriptionPoolInfo
+                .subscriptionPoolRemaining = subscriptionPoolRemaining;
+            currSubscriptionPoolInfo.lastModifiedAt = block.timestamp;
+            currSubscriptionPoolInfo
+                .liquidationStartedAt = liquidationStartedAt;
             netFees += feesToReap;
         }
         creatorFees += netFees;
     }
 
     function withdrawAccumulatedFees() public {
-        bondToken.safeTransfer(withdrawAddress, creatorFees);
+        subscriptionPoolToken.safeTransfer(withdrawAddress, creatorFees);
         creatorFees = 0;
     }
 
@@ -294,29 +323,38 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
     function _buyToken(
         uint256 tokenId,
         uint256 newPrice,
-        uint256 bondAmount
+        uint256 subscriptionPoolAmount
     ) internal virtual {
         uint256 price;
-        uint256 bond;
+        uint256 subscriptionPool;
         uint256 fees;
-        (price, bond, fees) = _getPriceBondFees(tokenId);
+        (price, subscriptionPool, fees) = _getPriceSubscriptionPoolFees(
+            tokenId
+        );
 
         address currentOwnerAddress = ownerOf(tokenId);
-        bondToken.safeTransferFrom(msg.sender, currentOwnerAddress, price);
-        bondToken.safeTransfer(currentOwnerAddress, bond);
+        subscriptionPoolToken.safeTransferFrom(
+            msg.sender,
+            currentOwnerAddress,
+            price
+        );
+        subscriptionPoolToken.safeTransfer(
+            currentOwnerAddress,
+            subscriptionPool
+        );
         creatorFees += fees;
 
-        _swapAndPostBond(
+        _swapAndPostSubscriptionPool(
             currentOwnerAddress,
             msg.sender,
             msg.sender,
             tokenId,
             newPrice,
-            bondAmount
+            subscriptionPoolAmount
         );
     }
 
-    function _getPriceBondFees(uint256 tokenId)
+    function _getPriceSubscriptionPoolFees(uint256 tokenId)
         internal
         view
         virtual
@@ -327,26 +365,31 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         )
     {
         if (!_exists(tokenId)) revert TokenDoesntExist();
-        BondInfo memory currentOwnersBond = _bondInfosAtLastCheckpoint[tokenId];
-        uint256 price = currentOwnersBond.statedPrice;
+        SubscriptionPoolInfo
+            memory currentOwnersSubscriptionPool = _subscriptionPoolInfosAtLastCheckpoint[
+                tokenId
+            ];
+        uint256 price = currentOwnersSubscriptionPool.statedPrice;
         uint256 feesToReap;
         uint256 liquidationStartedAt;
-        uint256 bondRemaining;
+        uint256 subscriptionPoolRemaining;
         (
-            bondRemaining,
+            subscriptionPoolRemaining,
             feesToReap,
             liquidationStartedAt
-        ) = _getCurrentBondInfoForToken(currentOwnersBond);
+        ) = _getCurrentSubscriptionPoolInfoForToken(
+            currentOwnersSubscriptionPool
+        );
 
         if (liquidationStartedAt != 0) {
             price = SafUtils.getLiquidationPrice(
-                currentOwnersBond.statedPrice,
+                currentOwnersSubscriptionPool.statedPrice,
                 block.timestamp - liquidationStartedAt,
                 halfLife
             );
         }
 
-        return (price, bondRemaining, feesToReap);
+        return (price, subscriptionPoolRemaining, feesToReap);
     }
 
     function _approve(address to, uint256 tokenId) internal virtual {
@@ -372,7 +415,7 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         address to,
         uint256 tokenId,
         uint256 initialStatedPrice,
-        uint256 bondAmount
+        uint256 subscriptionPoolAmount
     ) internal virtual {
         require(!_exists(tokenId), "Token already minted");
         require(to != address(0), "PaCo: mint to the zero address");
@@ -381,43 +424,65 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         _balances[to] += 1;
         _owners[tokenId] = to;
 
-        BondInfo storage bondInfoRef = _bondInfosAtLastCheckpoint[tokenId];
-        _persistNewBondInfo(bondInfoRef, initialStatedPrice, bondAmount);
-        bondToken.safeTransferFrom(to, address(this), bondAmount);
+        SubscriptionPoolInfo
+            storage subscriptionPoolInfoRef = _subscriptionPoolInfosAtLastCheckpoint[
+                tokenId
+            ];
+        _persistNewSubscriptionPoolInfo(
+            subscriptionPoolInfoRef,
+            initialStatedPrice,
+            subscriptionPoolAmount
+        );
+        subscriptionPoolToken.safeTransferFrom(
+            to,
+            address(this),
+            subscriptionPoolAmount
+        );
         emit Transfer(address(0), to, tokenId);
-        emit NewPriceBondSet(to, tokenId, initialStatedPrice, bondAmount);
+        emit NewPriceSubscriptionPoolSet(
+            to,
+            tokenId,
+            initialStatedPrice,
+            subscriptionPoolAmount
+        );
     }
 
-    function _alterStatedPriceAndBond(
+    function _alterStatedPriceAndSubscriptionPool(
         uint256 tokenId,
-        int256 bondDelta,
+        int256 subscriptionPoolDelta,
         int256 priceDelta
     ) internal virtual {
-        BondInfo storage lastBondInfo = _bondInfosAtLastCheckpoint[tokenId];
-        uint256 feesToReap = _modifyBondInfo(
-            lastBondInfo,
-            bondDelta,
+        SubscriptionPoolInfo
+            storage lastSubscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+                tokenId
+            ];
+        uint256 feesToReap = _modifySubscriptionPoolInfo(
+            lastSubscriptionPoolInfo,
+            subscriptionPoolDelta,
             priceDelta
         );
         creatorFees += feesToReap;
 
-        emit NewPriceBondSet(
+        emit NewPriceSubscriptionPoolSet(
             ownerOf(tokenId),
             tokenId,
-            lastBondInfo.statedPrice,
-            lastBondInfo.bondRemaining
+            lastSubscriptionPoolInfo.statedPrice,
+            lastSubscriptionPoolInfo.subscriptionPoolRemaining
         );
 
-        // if bond is increasing, transfer bond from owner to contract
-        if (bondDelta > 0) {
-            bondToken.safeTransferFrom(
+        // if subscriptionPool is increasing, transfer subscriptionPool from owner to contract
+        if (subscriptionPoolDelta > 0) {
+            subscriptionPoolToken.safeTransferFrom(
                 ownerOf(tokenId),
                 address(this),
-                uint256(bondDelta)
+                uint256(subscriptionPoolDelta)
             );
-            // if bond is decreasing, transfer bond refund to owner
-        } else if (bondDelta < 0) {
-            bondToken.safeTransfer(ownerOf(tokenId), uint256(-bondDelta));
+            // if subscriptionPool is decreasing, transfer subscriptionPool refund to owner
+        } else if (subscriptionPoolDelta < 0) {
+            subscriptionPoolToken.safeTransfer(
+                ownerOf(tokenId),
+                uint256(-subscriptionPoolDelta)
+            );
         }
     }
 
@@ -432,7 +497,7 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         _approve(address(0), _tokenId);
         _balances[owner] -= 1;
         delete _owners[_tokenId];
-        delete _bondInfosAtLastCheckpoint[_tokenId];
+        delete _subscriptionPoolInfosAtLastCheckpoint[_tokenId];
         emit Transfer(owner, address(0), _tokenId);
     }
 
@@ -488,28 +553,44 @@ abstract contract PaCoToken is IPaCoToken, BondTracker {
         _afterTokenTransfer(from, to, tokenId);
     }
 
-    function _swapAndPostBond(
+    function _swapAndPostSubscriptionPool(
         address from,
         address to,
         address payer,
         uint256 tokenId,
         uint256 newPrice,
-        uint256 bondAmount
+        uint256 subscriptionPoolAmount
     ) internal virtual {
         _transfer(from, to, tokenId);
-        bondToken.safeTransferFrom(payer, address(this), bondAmount);
-        _postBond(to, tokenId, newPrice, bondAmount);
+        subscriptionPoolToken.safeTransferFrom(
+            payer,
+            address(this),
+            subscriptionPoolAmount
+        );
+        _postSubscriptionPool(to, tokenId, newPrice, subscriptionPoolAmount);
     }
 
-    function _postBond(
+    function _postSubscriptionPool(
         address addr,
         uint256 tokenId,
         uint256 newPrice,
-        uint256 bondAmount
+        uint256 subscriptionPoolAmount
     ) internal virtual {
-        BondInfo storage bondInfoRef = _bondInfosAtLastCheckpoint[tokenId];
-        _persistNewBondInfo(bondInfoRef, newPrice, bondAmount);
-        emit NewPriceBondSet(addr, tokenId, newPrice, bondAmount);
+        SubscriptionPoolInfo
+            storage subscriptionPoolInfoRef = _subscriptionPoolInfosAtLastCheckpoint[
+                tokenId
+            ];
+        _persistNewSubscriptionPoolInfo(
+            subscriptionPoolInfoRef,
+            newPrice,
+            subscriptionPoolAmount
+        );
+        emit NewPriceSubscriptionPoolSet(
+            addr,
+            tokenId,
+            newPrice,
+            subscriptionPoolAmount
+        );
     }
 
     function _checkOnERC721Received(

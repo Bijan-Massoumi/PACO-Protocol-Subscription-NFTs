@@ -14,10 +14,10 @@ contract PacoFeeTest is TestPacoToken {
     function setUp() public override {
         super.setUp();
         uint256 statedPrice = oneETH * 100;
-        uint256 bond = oneETH * 100;
+        uint256 subscriptionPool = oneETH * 100;
 
         vm.prank(tokenWhale);
-        paco.mint(1, statedPrice, bond);
+        paco.mint(1, statedPrice, subscriptionPool);
         uint256[] memory whaleTokens = paco.getTokenIdsForAddress(tokenWhale);
         mintedTokenId = whaleTokens[0];
         startOnchainPrice = paco.getPrice(mintedTokenId);
@@ -39,22 +39,22 @@ contract PacoFeeTest is TestPacoToken {
         assertEq(feeCollected, oneETH * 20);
     }
 
-    function testBondCalculatedCorrectlyAfterPriceIncrease() public {
+    function testSubscriptionPoolCalculatedCorrectlyAfterPriceIncrease() public {
         vm.warp(startBlockTimestamp + 365 days);
-        uint256 remainingBond = paco.getBond(mintedTokenId);
-        assertEq(remainingBond, oneETH * 80);
+        uint256 remainingSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        assertEq(remainingSubscriptionPool, oneETH * 80);
 
         vm.prank(tokenWhale);
         paco.increaseStatedPrice(mintedTokenId, oneETH * 100);
         vm.warp(startBlockTimestamp + 365 days * 2);
-        remainingBond = paco.getBond(mintedTokenId);
-        assertEq(remainingBond, oneETH * 40);
+        remainingSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        assertEq(remainingSubscriptionPool, oneETH * 40);
     }
 
-    function testBondRemainingNeverNegative() public {
+    function testSubscriptionPoolRemainingNeverNegative() public {
         vm.warp(startBlockTimestamp + 365 days * 10);
-        uint256 remainingBond = paco.getBond(mintedTokenId);
-        assertEq(remainingBond, 0);
+        uint256 remainingSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        assertEq(remainingSubscriptionPool, 0);
     }
 
     function testReapSafForCreator() public {
@@ -65,31 +65,31 @@ contract PacoFeeTest is TestPacoToken {
 
         uint256 expectedAnnualFees = oneETH * 20 + oneETH * 2;
         paco.reapAndWithdrawFees(tokens);
-        uint256 balance = bondToken.balanceOf(withdrawAddr);
+        uint256 balance = subscriptionPoolToken.balanceOf(withdrawAddr);
         assertEq(balance, expectedAnnualFees);
 
         vm.warp(startBlockTimestamp + 365 days * 2);
         paco.reapAndWithdrawFees(tokens);
-        balance = bondToken.balanceOf(withdrawAddr);
+        balance = subscriptionPoolToken.balanceOf(withdrawAddr);
         assertEq(balance, expectedAnnualFees * 2);
     }
 
     function testWithdrawFeesAfterOwnerAlters() public {
         vm.warp(startBlockTimestamp + 365 days);
         vm.prank(tokenWhale);
-        paco.alterStatedPriceAndBond(mintedTokenId, 1, 1);
+        paco.alterStatedPriceAndSubscriptionPool(mintedTokenId, 1, 1);
         vm.prank(owner);
-        paco.alterStatedPriceAndBond(ownerTokenId, 1, 1);
+        paco.alterStatedPriceAndSubscriptionPool(ownerTokenId, 1, 1);
         paco.withdrawAccumulatedFees();
-        uint256 balance = bondToken.balanceOf(withdrawAddr);
+        uint256 balance = subscriptionPoolToken.balanceOf(withdrawAddr);
         assertEq(balance, oneETH * 20 + oneETH * 2);
     }
 
     function testFeeIsComputedCorrectlyInLiquidation() public {
         uint256 fiveYears = startBlockTimestamp + 365 days * 5;
         vm.warp(fiveYears);
-        uint256 remainingBond = paco.getBond(mintedTokenId);
-        assertEq(remainingBond, 0);
+        uint256 remainingSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        assertEq(remainingSubscriptionPool, 0);
         bool isLiquidating = paco.isBeingLiquidated(mintedTokenId);
         assertEq(isLiquidating, false);
 
@@ -110,8 +110,8 @@ contract PacoFeeTest is TestPacoToken {
         paco.setSelfAssessmentRate(500);
         vm.warp(startBlockTimestamp + 365 days * 3);
         vm.stopPrank();
-        uint256 bond = paco.getBond(mintedTokenId);
-        assertEq(bond, oneETH * 65);
+        uint256 subscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        assertEq(subscriptionPool, oneETH * 65);
     }
 
     function testLiquidationTimeCalculationAfterFeeChange() public {
@@ -120,9 +120,9 @@ contract PacoFeeTest is TestPacoToken {
         paco.setSelfAssessmentRate(1000);
         vm.warp(startBlockTimestamp + 365 days * 7);
         vm.stopPrank();
-        uint256 bond = paco.getBond(mintedTokenId);
+        uint256 subscriptionPool = paco.getSubscriptionPool(mintedTokenId);
         bool isLiquidating = paco.isBeingLiquidated(mintedTokenId);
-        assertEq(bond, 0);
+        assertEq(subscriptionPool, 0);
         assertEq(isLiquidating, false);
 
         vm.warp(startBlockTimestamp + (365 days * 7) + 2 days);

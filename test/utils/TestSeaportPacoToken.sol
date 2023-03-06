@@ -10,13 +10,13 @@ import {OfferItem, ConsiderationItem} from "../../src/SeaportStructs.sol";
 
 struct OwnerBalance {
     uint256 ownerBalance;
-    uint256 ownerBondRemaining;
+    uint256 ownerSubscriptionPoolRemaining;
     address owner;
 }
 
 abstract contract TestSeaportPacoToken is Test {
     PaCoSeaportExample paco;
-    TestToken bondToken;
+    TestToken subscriptionPoolToken;
     uint256 oneETH = 10**18;
 
     address seaportAddress = 0x00000000006c3852cbEf3e08E8dF289169EdE581;
@@ -34,33 +34,33 @@ abstract contract TestSeaportPacoToken is Test {
     function setUp() public virtual {
         // launch contracts
         vm.warp(startBlockTimestamp);
-        bondToken = new TestToken("TestToken", "TT");
+        subscriptionPoolToken = new TestToken("TestToken", "TT");
         vm.prank(tokenWhale);
-        bondToken.mint(oneETH * 1000000000);
+        subscriptionPoolToken.mint(oneETH * 1000000000);
         vm.startPrank(owner);
         paco = new PaCoSeaportExample(
-            address(bondToken),
+            address(subscriptionPoolToken),
             withdrawAddr,
             feeRate,
             seaportAddress
         );
         vm.stopPrank();
 
-        // approve PaCo allowance for bond token
+        // approve PaCo allowance for subscriptionPool token
         vm.prank(tokenWhale);
-        bondToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
         vm.prank(owner);
-        bondToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
         vm.prank(addr2);
-        bondToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
         vm.prank(addr3);
-        bondToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
 
         // fund wallets
         vm.startPrank(tokenWhale);
-        bondToken.transfer(owner, oneETH * 500);
-        bondToken.transfer(addr2, oneETH * 500);
-        bondToken.transfer(addr3, oneETH * 500);
+        subscriptionPoolToken.transfer(owner, oneETH * 500);
+        subscriptionPoolToken.transfer(addr2, oneETH * 500);
+        subscriptionPoolToken.transfer(addr3, oneETH * 500);
         vm.stopPrank();
 
         // mint multiple paco tokens to each wallet
@@ -77,8 +77,8 @@ abstract contract TestSeaportPacoToken is Test {
 
     function approveNewAddress(address addr) public {
         vm.startPrank(addr);
-        bondToken.approve(address(paco), oneETH * 10000);
-        bondToken.approve(seaportAddress, oneETH * 10000);
+        subscriptionPoolToken.approve(address(paco), oneETH * 10000);
+        subscriptionPoolToken.approve(seaportAddress, oneETH * 10000);
         vm.stopPrank();
     }
 
@@ -133,7 +133,7 @@ abstract contract TestSeaportPacoToken is Test {
             uint256 price = paco.getPrice(tokenIds[i]);
             consideration[i] = ConsiderationItem(
                 ItemType.ERC20,
-                address(bondToken),
+                address(subscriptionPoolToken),
                 0,
                 price,
                 price,
@@ -155,9 +155,13 @@ abstract contract TestSeaportPacoToken is Test {
         OwnerBalance[] memory ownerBal = new OwnerBalance[](tokenIds.length);
         for (uint256 i = 0; i < tokenIds.length; i++) {
             address tokenOwner = paco.ownerOf(tokenIds[i]);
-            uint256 bond = paco.getBond(tokenIds[i]);
-            uint256 ownerBalance = bondToken.balanceOf(owner);
-            ownerBal[i] = OwnerBalance(ownerBalance, bond, tokenOwner);
+            uint256 subscriptionPool = paco.getSubscriptionPool(tokenIds[i]);
+            uint256 ownerBalance = subscriptionPoolToken.balanceOf(owner);
+            ownerBal[i] = OwnerBalance(
+                ownerBalance,
+                subscriptionPool,
+                tokenOwner
+            );
         }
         return ownerBal;
     }

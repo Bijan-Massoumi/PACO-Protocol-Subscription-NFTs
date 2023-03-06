@@ -8,49 +8,49 @@ import "forge-std/Test.sol";
 import "../src/SafUtils.sol";
 import "./utils/TestPacoToken.sol";
 
-contract PacoAlterBondTest is TestPacoToken {
+contract PacoAlterSubscriptionPoolTest is TestPacoToken {
     uint256 mintedTokenId;
-    uint256 startOnchainBond;
+    uint256 startOnchainSubscriptionPool;
     uint256 startOnchainPrice;
 
-    error InsufficientBond();
+    error InsufficientSubscriptionPool();
 
     function setUp() public override {
         super.setUp();
         uint256 statedPrice = oneETH * 100;
-        uint256 bond = oneETH * 11;
+        uint256 subscriptionPool = oneETH * 11;
 
         vm.prank(tokenWhale);
-        paco.mint(1, statedPrice, bond);
+        paco.mint(1, statedPrice, subscriptionPool);
         uint256[] memory ownedTokens = paco.getTokenIdsForAddress(tokenWhale);
         mintedTokenId = ownedTokens[0];
-        startOnchainBond = paco.getBond(mintedTokenId);
+        startOnchainSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
         startOnchainPrice = paco.getPrice(mintedTokenId);
     }
 
-    function testBondCanBeIncreased() public {
-        uint256 prevBalance = bondToken.balanceOf(tokenWhale);
+    function testSubscriptionPoolCanBeIncreased() public {
+        uint256 prevBalance = subscriptionPoolToken.balanceOf(tokenWhale);
         vm.prank(tokenWhale);
-        paco.increaseBond(mintedTokenId, oneETH * 2);
-        uint256 newBond = paco.getBond(mintedTokenId);
-        uint256 newBalance = bondToken.balanceOf(tokenWhale);
-        assertEq(newBond, startOnchainBond + oneETH * 2);
+        paco.increaseSubscriptionPool(mintedTokenId, oneETH * 2);
+        uint256 newSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        uint256 newBalance = subscriptionPoolToken.balanceOf(tokenWhale);
+        assertEq(newSubscriptionPool, startOnchainSubscriptionPool + oneETH * 2);
         assertEq(newBalance, prevBalance - oneETH * 2);
     }
 
-    function testBondCanBeDecreased() public {
-        uint256 beforeBalance = bondToken.balanceOf(tokenWhale);
+    function testSubscriptionPoolCanBeDecreased() public {
+        uint256 beforeBalance = subscriptionPoolToken.balanceOf(tokenWhale);
         vm.prank(tokenWhale);
-        paco.decreaseBond(mintedTokenId, oneETH);
-        uint256 newBond = paco.getBond(mintedTokenId);
-        uint256 afterBalance = bondToken.balanceOf(tokenWhale);
-        assertEq(newBond, startOnchainBond - oneETH);
+        paco.decreaseSubscriptionPool(mintedTokenId, oneETH);
+        uint256 newSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        uint256 afterBalance = subscriptionPoolToken.balanceOf(tokenWhale);
+        assertEq(newSubscriptionPool, startOnchainSubscriptionPool - oneETH);
         assertEq(afterBalance, beforeBalance + oneETH);
     }
 
-    function testFailBondCanNotBeDecreasedBelowZero() public {
+    function testFailSubscriptionPoolCanNotBeDecreasedBelowZero() public {
         vm.prank(tokenWhale);
-        paco.decreaseBond(mintedTokenId, oneETH * 100);
+        paco.decreaseSubscriptionPool(mintedTokenId, oneETH * 100);
     }
 
     function testPriceCanBeIncreased() public {
@@ -67,27 +67,27 @@ contract PacoAlterBondTest is TestPacoToken {
         assertEq(newPrice, startOnchainPrice - oneETH);
     }
 
-    function testFailPriceCanNotBeIncreasedBeyondBond() public {
+    function testFailPriceCanNotBeIncreasedBeyondSubscriptionPool() public {
         vm.prank(tokenWhale);
         paco.increaseStatedPrice(mintedTokenId, oneETH * 100);
     }
 
-    function testPriceAndBondBeIncreased() public {
+    function testPriceAndSubscriptionPoolBeIncreased() public {
         vm.prank(tokenWhale);
-        paco.alterStatedPriceAndBond(
+        paco.alterStatedPriceAndSubscriptionPool(
             mintedTokenId,
             int256(oneETH),
             int256(oneETH * 2)
         );
-        uint256 newBond = paco.getBond(mintedTokenId);
+        uint256 newSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
         uint256 newPrice = paco.getPrice(mintedTokenId);
         assertEq(newPrice, startOnchainPrice + oneETH);
-        assertEq(newBond, startOnchainBond + oneETH * 2);
+        assertEq(newSubscriptionPool, startOnchainSubscriptionPool + oneETH * 2);
     }
 
-    function testFailAlterRevertsWithBondTooLittle() public {
+    function testFailAlterRevertsWithSubscriptionPoolTooLittle() public {
         vm.prank(tokenWhale);
-        paco.alterStatedPriceAndBond(
+        paco.alterStatedPriceAndSubscriptionPool(
             mintedTokenId,
             int256(oneETH),
             -int256(oneETH * 5)
@@ -104,16 +104,16 @@ contract PacoAlterBondTest is TestPacoToken {
         uint256 price = paco.getPrice(tokenId);
         assertEq(price, oneETH * 50);
 
-        vm.expectRevert(InsufficientBond.selector);
+        vm.expectRevert(InsufficientSubscriptionPool.selector);
         vm.prank(tokenWhale);
         paco.increaseStatedPrice(tokenId, oneETH * 200);
 
-        vm.expectRevert(InsufficientBond.selector);
+        vm.expectRevert(InsufficientSubscriptionPool.selector);
         vm.prank(tokenWhale);
-        paco.increaseBond(tokenId, oneETH * 9);
+        paco.increaseSubscriptionPool(tokenId, oneETH * 9);
 
         vm.prank(tokenWhale);
-        paco.increaseBond(tokenId, oneETH * 10);
+        paco.increaseSubscriptionPool(tokenId, oneETH * 10);
         price = paco.getPrice(tokenId);
         assertEq(price, oneETH * 100);
     }
