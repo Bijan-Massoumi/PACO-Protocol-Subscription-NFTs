@@ -8,7 +8,6 @@ import "./BondTracker.sol";
 import "./IPaCoToken.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 abstract contract PaCoToken is IPaCoToken, BondTracker {
     using Address for address;

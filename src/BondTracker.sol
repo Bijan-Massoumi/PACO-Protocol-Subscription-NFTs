@@ -25,6 +25,8 @@ abstract contract BondTracker is Ownable {
     uint256 internal minimumBond = 1000;
     //set by constructor
     uint256 internal selfAssessmentRate;
+    // 100% fee rate
+    uint256 internal maxSelfAssessmentRate = 10000;
 
     /// ============ Errors ============
     /// @notice Thrown if invalid price values
@@ -33,6 +35,7 @@ abstract contract BondTracker is Ownable {
     error InvalidAlterBondValue();
     /// @notice Thrown if bond isnt enough to cover miminum bond
     error InsufficientBond();
+    error InvalidAssessmentFee();
 
     constructor(uint256 _selfAssessmentRate) {
         selfAssessmentRate = _selfAssessmentRate;
@@ -51,10 +54,14 @@ abstract contract BondTracker is Ownable {
         return liquidationStartedAt;
     }
 
-    function setSelfAssessmentRate(uint16 newSelfAssessmentRate)
+    function setSelfAssessmentRate(uint256 newSelfAssessmentRate)
         external
         onlyOwner
     {
+        if (newSelfAssessmentRate > maxSelfAssessmentRate) {
+            revert InvalidAssessmentFee();
+        }
+
         feeChangeTimestamps.push(
             FeeChangeTimestamp({
                 timestamp: block.timestamp,
@@ -64,7 +71,7 @@ abstract contract BondTracker is Ownable {
         selfAssessmentRate = newSelfAssessmentRate;
     }
 
-    function setMinimumBond(uint16 newMinimumBond) external onlyOwner {
+    function setMinimumBond(uint256 newMinimumBond) external onlyOwner {
         minimumBond = newMinimumBond;
     }
 

@@ -10,6 +10,7 @@ import {OfferItem, ConsiderationItem} from "../../src/SeaportStructs.sol";
 
 struct OwnerBalance {
     uint256 ownerBalance;
+    uint256 ownerBondRemaining;
     address owner;
 }
 
@@ -86,12 +87,18 @@ abstract contract TestSeaportPacoToken is Test {
         paco.approve(seaportAddress, tokenId);
     }
 
-    function createOfferForTokenIds(uint256[] memory tokenIds)
-        public
-        view
-        returns (OfferItem[] memory)
-    {
-        OfferItem[] memory offer = new OfferItem[](tokenIds.length);
+    function createOfferForTokenIds(
+        uint256[] memory tokenIds,
+        OfferItem memory extraOffer
+    ) public view returns (OfferItem[] memory) {
+        uint256 size;
+        if (extraOffer.token == address(0)) {
+            size = tokenIds.length;
+        } else {
+            size = tokenIds.length + 1;
+        }
+
+        OfferItem[] memory offer = new OfferItem[](size);
         for (uint256 i = 0; i < tokenIds.length; i++) {
             offer[i] = OfferItem(
                 ItemType.ERC721,
@@ -101,16 +108,26 @@ abstract contract TestSeaportPacoToken is Test {
                 1
             );
         }
+
+        if (size > tokenIds.length) {
+            offer[size - 1] = extraOffer;
+        }
         return offer;
     }
 
-    function createConsiderationForTokenIds(uint256[] memory tokenIds)
-        public
-        view
-        returns (ConsiderationItem[] memory, uint256)
-    {
+    function createConsiderationForTokenIds(
+        uint256[] memory tokenIds,
+        ConsiderationItem memory extraConsideration
+    ) public view returns (ConsiderationItem[] memory, uint256) {
+        uint256 size;
+        if (extraConsideration.token == address(0)) {
+            size = tokenIds.length;
+        } else {
+            size = tokenIds.length + 1;
+        }
+
         ConsiderationItem[] memory consideration = new ConsiderationItem[](
-            tokenIds.length
+            size
         );
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 price = paco.getPrice(tokenIds[i]);
@@ -123,6 +140,10 @@ abstract contract TestSeaportPacoToken is Test {
                 payable(paco.ownerOf(tokenIds[i]))
             );
         }
+        if (size > tokenIds.length) {
+            consideration[size - 1] = extraConsideration;
+        }
+
         return (consideration, consideration.length);
     }
 
@@ -134,9 +155,32 @@ abstract contract TestSeaportPacoToken is Test {
         OwnerBalance[] memory ownerBal = new OwnerBalance[](tokenIds.length);
         for (uint256 i = 0; i < tokenIds.length; i++) {
             address tokenOwner = paco.ownerOf(tokenIds[i]);
+            uint256 bond = paco.getBond(tokenIds[i]);
             uint256 ownerBalance = bondToken.balanceOf(owner);
-            ownerBal[i] = OwnerBalance(ownerBalance, tokenOwner);
+            ownerBal[i] = OwnerBalance(ownerBalance, bond, tokenOwner);
         }
         return ownerBal;
+    }
+
+    function combineConsiderations(
+        ConsiderationItem[] memory consideration,
+        ConsiderationItem[] memory extraConsideration
+    ) public pure returns (ConsiderationItem[] memory) {
+        ConsiderationItem[] memory result = new ConsiderationItem[](
+            consideration.length + extraConsideration.length
+        );
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < consideration.length; i++) {
+            result[index] = consideration[i];
+            index++;
+        }
+
+        for (uint256 i = 0; i < extraConsideration.length; i++) {
+            result[index] = extraConsideration[i];
+            index++;
+        }
+
+        return result;
     }
 }

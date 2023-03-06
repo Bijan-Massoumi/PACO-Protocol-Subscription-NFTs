@@ -5,6 +5,8 @@ pragma solidity 0.8.18;
 import "./PaCoToken.sol";
 import "./PaCoTokenEnumerable.sol";
 
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 contract PaCoExample is PaCoTokenEnumerable, ReentrancyGuard {
     uint256 public constant mintPrice = 1;
     uint256 public constant MAX_SUPPLY = 10000;

@@ -4,8 +4,10 @@ pragma solidity 0.8.18;
 
 import "./PaCoTokenEnumerable.sol";
 import "forge-std/Test.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {ConsiderationItem, CriteriaResolver, AdvancedOrder, OfferItem, OrderType, ItemType, OrderType, OrderParameters} from "./SeaportStructs.sol";
 import {SeaportInterface} from "./SeaportInterface.sol";
+import {ISeaportErrors} from "./ISeaportErrors.sol";
 
 struct OwnerOwnedAmount {
     address owner;
@@ -14,7 +16,16 @@ struct OwnerOwnedAmount {
     uint256 payed;
 }
 
-abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
+struct Tip {
+    address recipient;
+    uint256 amount;
+}
+
+abstract contract SeaportPaCoToken is
+    PaCoTokenEnumerable,
+    ISeaportErrors,
+    ReentrancyGuard
+{
     address seaportAddress;
     // tokenID to authorized bool
     mapping(uint256 => bool) internal authorizedForTransfer;
@@ -22,16 +33,6 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
     using SafeERC20 for IERC20;
 
     // Errors --------------------------------------------
-
-    error SeaportSwapFailed();
-    error NonPacoToken();
-    error FufillerSameAsTokenOwner();
-    error NonStaticAmount();
-    error InsufficientOwnerPayment();
-    error InsufficientZonePayment();
-    error NonExactBondAmount();
-    error UnknownRecipient();
-    error InvalidOwner();
 
     constructor(
         address tokenAddress,
@@ -43,51 +44,51 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
         bondToken.approve(seaportAddress, 2**256 - 1);
     }
 
-    // todo add bond refund to order
+    // todo add bond refund to order. add to fufill order?
     function fulfillOrder(
         OfferItem[] calldata offer, // 0x40
         ConsiderationItem[] calldata consideration, // 0x60
         uint256[] calldata newStatedPrices,
         uint256[] calldata newBondAmounts
-    ) external payable returns (bool fulfilled) {
+    ) external payable nonReentrant returns (bool fulfilled) {
         // validate consideration and offer
         uint256[] memory offerTokenIds;
-        uint256 otiSize = 0;
+        uint256 offerTokenIdsSize = 0;
         OwnerOwnedAmount[] memory amountDueToTokenOwners;
-        uint256 amountDueSize;
-        uint256 totalSenderCollect;
+        uint256 amountDueOwnersSize;
+        uint256 senderFunds;
         (
             offerTokenIds,
-            otiSize,
+            offerTokenIdsSize,
             amountDueToTokenOwners,
-            amountDueSize,
-            totalSenderCollect
+            amountDueOwnersSize,
+            senderFunds
         ) = _preprocessOffer(offer);
-        _verifyConsideration(
+        uint256 totalTips = _verifyConsideration(
             consideration,
             amountDueToTokenOwners,
-            amountDueSize
+            amountDueOwnersSize
         );
 
-        // collect payment from msg.sender for purchased token bonds
+        // collect payment from msg.sender for purchased token bonds + tip payments
+        senderFunds += totalTips;
         for (uint256 i = 0; i < newBondAmounts.length; i++) {
-            totalSenderCollect == newBondAmounts[i];
+            senderFunds += newBondAmounts[i];
         }
-        bondToken.safeTransferFrom(
-            msg.sender,
-            address(this),
-            totalSenderCollect
-        );
+        bondToken.safeTransferFrom(msg.sender, address(this), senderFunds);
 
         // fulfill order and swap assets
-        for (uint256 i = 0; i < otiSize; i++) {
+        for (uint256 i = 0; i < offerTokenIdsSize; i++) {
             _prepareTokenForSeaportTransfer(offerTokenIds[i]);
         }
-        _fufillOrder(offer, consideration);
+        _fufillOrder(
+            offer,
+            _addRefundsToConsideration(consideration, amountDueToTokenOwners)
+        );
 
         // update bondInfo for each token transferred
         uint256 totalbond = 0;
-        for (uint256 i = 0; i < otiSize; i++) {
+        for (uint256 i = 0; i < offerTokenIdsSize; i++) {
             totalbond += newBondAmounts[i];
             // reverts if bond too little
             _postBond(
@@ -103,8 +104,8 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
     }
 
     function _fufillOrder(
-        OfferItem[] calldata offer, // 0x40
-        ConsiderationItem[] calldata consideration // 0x60
+        OfferItem[] memory offer, // 0x40
+        ConsiderationItem[] memory consideration // 0x60
     ) internal {
         OrderParameters memory params = OrderParameters(
             address(this),
@@ -144,7 +145,6 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
         returns (
             uint256[] memory,
             uint256,
-            // positionally aligns with offerTokenIds
             OwnerOwnedAmount[] memory,
             uint256,
             uint256
@@ -152,7 +152,7 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
     {
         uint256 totalPrice = 0;
         // create max length arrays
-        uint256 otiSize = 0;
+        uint256 offerTokenIdsSize = 0;
         uint256[] memory offerTokenIds = new uint256[](offer.length);
 
         uint256 ooaSize = 0;
@@ -172,7 +172,7 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
             (price, bond, fees) = _getPriceBondFees(
                 offerItem.identifierOrCriteria
             );
-            offerTokenIds[otiSize++] = offerItem.identifierOrCriteria;
+            offerTokenIds[offerTokenIdsSize++] = offerItem.identifierOrCriteria;
 
             // calculate amount due to token owners of offer
             bool found = false;
@@ -195,31 +195,37 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
             found = false;
             totalPrice += price;
         }
+
         return (
             offerTokenIds,
-            otiSize,
+            offerTokenIdsSize,
             amountDueToTokenOwners,
             ooaSize,
             totalPrice
         );
     }
 
+    // TODO allow for tip payment in bondToken
     function _verifyConsideration(
         ConsiderationItem[] memory consideration,
         OwnerOwnedAmount[] memory amountDueToTokenOwners,
-        uint256 amountDueSize
-    ) internal view {
+        uint256 amountDueOwnersSize
+    ) internal view returns (uint256 totalTip) {
+        Tip[] memory tips = new Tip[](consideration.length);
+        uint256 tipIdx = 0;
         for (uint256 i = 0; i < consideration.length; i++) {
             ConsiderationItem memory considerationItem = consideration[i];
             if (considerationItem.startAmount != considerationItem.endAmount)
                 revert NonStaticAmount();
+            if (considerationItem.token != address(bondToken))
+                revert NonBondToken();
 
+            // check if payment is to offer token owner or a tip to an unknown address
             bool sendingToKnownAddr = false;
-            for (uint256 j = 0; j < amountDueSize; j++) {
+            for (uint256 j = 0; j < amountDueOwnersSize; j++) {
                 if (
                     amountDueToTokenOwners[j].owner ==
-                    considerationItem.recipient &&
-                    considerationItem.token == address(bondToken)
+                    considerationItem.recipient
                 ) {
                     amountDueToTokenOwners[j].payed += considerationItem
                         .endAmount;
@@ -227,13 +233,50 @@ abstract contract SeaportPaCoToken is PaCoTokenEnumerable {
                     break;
                 }
             }
-            if (!sendingToKnownAddr) revert UnknownRecipient();
+            if (!sendingToKnownAddr) {
+                tips[tipIdx++] = Tip(
+                    considerationItem.recipient,
+                    considerationItem.endAmount
+                );
+                totalTip += considerationItem.endAmount;
+            }
         }
+
+        // check that all owed amounts are paid
         for (uint256 i = 0; i < amountDueToTokenOwners.length; i++) {
             if (
                 amountDueToTokenOwners[i].owed > amountDueToTokenOwners[i].payed
             ) revert InsufficientOwnerPayment();
         }
+    }
+
+    function _addRefundsToConsideration(
+        ConsiderationItem[] memory consideration,
+        OwnerOwnedAmount[] memory refunds
+    ) internal view returns (ConsiderationItem[] memory) {
+        ConsiderationItem[] memory result = new ConsiderationItem[](
+            consideration.length + refunds.length
+        );
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < consideration.length; i++) {
+            result[index] = consideration[i];
+            index++;
+        }
+
+        for (uint256 i = 0; i < refunds.length; i++) {
+            result[index] = ConsiderationItem(
+                ItemType.ERC20,
+                address(bondToken),
+                0,
+                refunds[i].refund,
+                refunds[i].refund,
+                payable(refunds[i].owner)
+            );
+            index++;
+        }
+
+        return result;
     }
 
     function _prepareTokenForSeaportTransfer(uint256 tokenId) internal {
