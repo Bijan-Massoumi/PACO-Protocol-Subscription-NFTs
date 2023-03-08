@@ -7,7 +7,6 @@ interface IPacoToken {
     event Transfer(address from, address to, uint256 _tokenId);
 
     event NewPriceSubscriptionPoolSet(
-        address owner,
         uint256 tokenId,
         uint256 price,
         uint256 subscriptionPool

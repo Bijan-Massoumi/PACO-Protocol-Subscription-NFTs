@@ -428,7 +428,6 @@ abstract contract PacoToken is
         );
         emit Transfer(address(0), to, tokenId);
         emit NewPriceSubscriptionPoolSet(
-            to,
             tokenId,
             initialStatedPrice,
             subscriptionPoolAmount
@@ -452,7 +451,6 @@ abstract contract PacoToken is
         creatorFees += feesToReap;
 
         emit NewPriceSubscriptionPoolSet(
-            ownerOf(tokenId),
             tokenId,
             lastSubscriptionPoolInfo.statedPrice,
             lastSubscriptionPoolInfo.subscriptionPoolRemaining
@@ -555,11 +553,10 @@ abstract contract PacoToken is
             address(this),
             subscriptionPoolAmount
         );
-        _postSubscriptionPool(to, tokenId, newPrice, subscriptionPoolAmount);
+        _postSubscriptionPool(tokenId, newPrice, subscriptionPoolAmount);
     }
 
     function _postSubscriptionPool(
-        address addr,
         uint256 tokenId,
         uint256 newPrice,
         uint256 subscriptionPoolAmount
@@ -574,7 +571,6 @@ abstract contract PacoToken is
             subscriptionPoolAmount
         );
         emit NewPriceSubscriptionPoolSet(
-            addr,
             tokenId,
             newPrice,
             subscriptionPoolAmount
