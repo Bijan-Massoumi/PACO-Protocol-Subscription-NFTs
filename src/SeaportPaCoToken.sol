@@ -96,7 +96,6 @@ abstract contract SeaportPacoToken is
             totalsubscriptionPool += newSubscriptionPoolAmounts[i];
             // reverts if subscriptionPool too little
             _postSubscriptionPool(
-                msg.sender,
                 offerTokenIds[i],
                 newStatedPrices[i],
                 newSubscriptionPoolAmounts[i]

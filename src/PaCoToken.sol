@@ -13,7 +13,8 @@ import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 abstract contract PacoToken is
     IPacoToken,
     SubscriptionPoolTracker,
-    IPacoTokenErrors
+    IPacoTokenErrors,
+    Ownable
 {
     using Address for address;
     using SafeERC20 for IERC20;
@@ -132,10 +133,23 @@ abstract contract PacoToken is
         return subscriptionPoolRemaining;
     }
 
-    function burnToken(uint256 tokenId) external {
-        if (ownerOf(tokenId) != msg.sender) revert IsNotOwner();
+    function setSelfAssessmentRate(uint256 newSubscriptionRate)
+        external
+        onlyOwner
+    {
+        if (newSubscriptionRate > maxSubscriptionRate) {
+            revert InvalidAssessmentFee();
+        }
 
-        _burnToken(tokenId);
+        _setSubscriptionRate(newSubscriptionRate);
+        emit NewSubscriptionRateSet(newSubscriptionRate);
+    }
+
+    function setMinimumSubscriptionPool(uint256 newMinimumPoolRatio)
+        external
+        onlyOwner
+    {
+        _setMinimumSubscriptionPool(newMinimumPoolRatio);
     }
 
     function setHalfLife(uint16 newHalfLife) external onlyOwner {
@@ -177,6 +191,12 @@ abstract contract PacoToken is
         returns (uint256)
     {
         return _subscriptionPoolInfosAtLastCheckpoint[_tokenId].statedPrice;
+    }
+
+    function burnToken(uint256 tokenId) external {
+        if (ownerOf(tokenId) != msg.sender) revert IsNotOwner();
+
+        _burnToken(tokenId);
     }
 
     // Public functions ------------------------------------------------------

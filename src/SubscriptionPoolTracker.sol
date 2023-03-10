@@ -17,24 +17,21 @@ struct FeeChangeTimestamp {
     uint256 previousRate;
 }
 
-abstract contract SubscriptionPoolTracker is
-    Ownable,
-    ISubscriptionPoolTrackerErrors
-{
+abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
     mapping(uint256 => SubscriptionPoolInfo)
         internal _subscriptionPoolInfosAtLastCheckpoint;
     FeeChangeTimestamp[] feeChangeTimestamps;
 
     // min percentage (10%) of total stated price that
     // must be convered by subscriptionPool
-    uint256 internal minimumSubscriptionPool = 1000;
+    uint256 internal minimumPoolRatio = 1000;
     //set by constructor
-    uint256 internal selfAssessmentRate;
+    uint256 internal subscriptionRate;
     // 100% fee rate
-    uint256 internal maxSelfAssessmentRate = 10000;
+    uint256 internal maxSubscriptionRate = 10000;
 
-    constructor(uint256 _selfAssessmentRate) {
-        selfAssessmentRate = _selfAssessmentRate;
+    constructor(uint256 _subscriptionRate) {
+        subscriptionRate = _subscriptionRate;
     }
 
     function getLiquidationStartedAt(uint256 tokenId)
@@ -53,28 +50,22 @@ abstract contract SubscriptionPoolTracker is
         return liquidationStartedAt;
     }
 
-    function setSelfAssessmentRate(uint256 newSelfAssessmentRate)
-        external
-        onlyOwner
-    {
-        if (newSelfAssessmentRate > maxSelfAssessmentRate) {
+    function _setSubscriptionRate(uint256 newsubscriptionRate) internal {
+        if (newsubscriptionRate > maxSubscriptionRate) {
             revert InvalidAssessmentFee();
         }
 
         feeChangeTimestamps.push(
             FeeChangeTimestamp({
                 timestamp: block.timestamp,
-                previousRate: selfAssessmentRate
+                previousRate: subscriptionRate
             })
         );
-        selfAssessmentRate = newSelfAssessmentRate;
+        subscriptionRate = newsubscriptionRate;
     }
 
-    function setMinimumSubscriptionPool(uint256 newMinimumSubscriptionPool)
-        external
-        onlyOwner
-    {
-        minimumSubscriptionPool = newMinimumSubscriptionPool;
+    function _setMinimumSubscriptionPool(uint256 newMinimumPoolRatio) internal {
+        minimumPoolRatio = newMinimumPoolRatio;
     }
 
     function _getCurrentSubscriptionPoolInfoForToken(
@@ -168,13 +159,13 @@ abstract contract SubscriptionPoolTracker is
             statedPrice,
             startTime,
             block.timestamp,
-            selfAssessmentRate
+            subscriptionRate
         );
         if (totalFee > subscriptionPoolRemaining) {
             liquidationTime = SafUtils._getTimeLiquidationBegan(
                 statedPrice,
                 startTime,
-                selfAssessmentRate,
+                subscriptionRate,
                 subscriptionPoolRemaining - prevIntervalFee
             );
         }
@@ -220,7 +211,7 @@ abstract contract SubscriptionPoolTracker is
     ) internal {
         if (
             newSubscriptionPoolAmount <
-            (newStatedPrice * minimumSubscriptionPool) / 10000
+            (newStatedPrice * minimumPoolRatio) / 10000
         ) revert InsufficientSubscriptionPool();
 
         subscriptionPoolInfoRef.statedPrice = newStatedPrice;

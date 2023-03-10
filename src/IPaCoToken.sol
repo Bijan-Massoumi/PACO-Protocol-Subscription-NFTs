@@ -12,6 +12,8 @@ interface IPacoToken {
         uint256 subscriptionPool
     );
 
+    event NewSubscriptionRateSet(uint256 subscriptionRate);
+
     event Approval(
         address indexed _owner,
         address indexed _approved,
