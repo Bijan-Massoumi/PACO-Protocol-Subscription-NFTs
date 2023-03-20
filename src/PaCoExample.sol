@@ -23,7 +23,7 @@ contract PacoExample is PacoTokenEnumerable, ReentrancyGuard {
     constructor(
         address tokenAddress,
         address withdrawAddress,
-        uint16 selfAssessmentRate
+        uint256 selfAssessmentRate
     ) PacoTokenEnumerable(tokenAddress, withdrawAddress, selfAssessmentRate) {
         _name = "Example";
         _symbol = "EXE";
@@ -56,12 +56,12 @@ contract PacoExample is PacoTokenEnumerable, ReentrancyGuard {
     function _mint(
         uint256 numberOfTokens,
         address sender,
-        uint256 tokenId,
+        uint256 index,
         uint256 price,
         uint256 subscriptionPool
     ) private {
         for (uint256 i = 0; i < numberOfTokens; i++) {
-            _mint(sender, tokenId, price, subscriptionPool);
+            _mint(sender, index + i, price, subscriptionPool);
         }
     }
 

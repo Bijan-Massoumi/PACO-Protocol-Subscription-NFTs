@@ -1,16 +1,20 @@
 {
-  "name": "Paco-Foundry",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "@bijan-massoumi/paco-protocol",
+  "version": "0.1.1",
+  "description": "Hardhat types for the paco protocol",
   "scripts": {
     "test": "forge test --fork-url $RPC -vv ",
-    "build": "forge build ; typechain --target=ethers-v5 --out-dir ./typechain ./out/PacoExample.sol/PacoExample.json",
-    "startNode": "anvil -m 'test test test test test test test test test test test junk'"
+    "build": "forge compile --force ; typechain --target=ethers-v5 --out-dir ./typechain ./out/*Example.sol/*.json",
+    "startNode": "anvil -m 'test test test test test test test test test test test junk'",
+    "deployLocal": "forge script script/deploylocalPacoExample.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --skip-simulation"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "files":[
+    "typechain",
+    "src/*"
+  ],
   "dependencies": {
     "@opensea/seaport-js": "^1.0.8",
     "ethers": "^5.0.0",

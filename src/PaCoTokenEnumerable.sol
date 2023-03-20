@@ -18,7 +18,7 @@ abstract contract PacoTokenEnumerable is PacoToken {
     constructor(
         address _erc20Address,
         address _withdrawAddress,
-        uint16 _selfAssessmentRate
+        uint256 _selfAssessmentRate
     ) PacoToken(_erc20Address, _withdrawAddress, _selfAssessmentRate) {}
 
     /**

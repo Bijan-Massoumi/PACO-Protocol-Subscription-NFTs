@@ -37,7 +37,7 @@ abstract contract PacoToken is
     constructor(
         address _erc20Address,
         address _withdrawAddress,
-        uint16 _selfAssessmentRate
+        uint256 _selfAssessmentRate
     ) Ownable() SubscriptionPoolTracker(_selfAssessmentRate) {
         subscriptionPoolToken = IERC20(_erc20Address);
         withdrawAddress = _withdrawAddress;

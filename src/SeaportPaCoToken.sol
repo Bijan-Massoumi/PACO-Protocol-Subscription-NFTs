@@ -208,7 +208,6 @@ abstract contract SeaportPacoToken is
         );
     }
 
-    // TODO allow for tip payment in subscriptionPoolToken
     function _verifyConsideration(
         ConsiderationItem[] memory consideration,
         OwnerOwnedAmount[] memory amountDueToTokenOwners,

@@ -4,7 +4,7 @@ pragma solidity 0.8.18;
 
 //inspired by ERC721 and ERC721Enumerable
 interface IPacoToken {
-    event Transfer(address from, address to, uint256 _tokenId);
+    event Transfer(address from, address to, uint256 tokenId);
 
     event NewPriceSubscriptionPoolSet(
         uint256 tokenId,
