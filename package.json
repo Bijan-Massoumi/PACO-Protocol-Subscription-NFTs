@@ -1,11 +1,11 @@
 {
   "name": "@bijan-massoumi/paco-protocol",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Hardhat types for the paco protocol",
   "scripts": {
     "test": "forge test --fork-url $RPC -vv ",
     "build": "forge compile --force ; typechain --target=ethers-v5 --out-dir ./typechain ./out/*Example.sol/*.json",
-    "startNode": "anvil -m 'test test test test test test test test test test test junk'",
+    "startNode": "anvil -m 'test test test test test test test test test test test junk' --chain-id 1337",
     "deployLocal": "forge script script/deploylocalPacoExample.s.sol --rpc-url http://127.0.0.1:8545 --broadcast --skip-simulation"
   },
   "keywords": [],
