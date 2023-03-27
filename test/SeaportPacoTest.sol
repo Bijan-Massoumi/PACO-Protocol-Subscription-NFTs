@@ -81,7 +81,7 @@ contract SeaportPacoTest is TestSeaportPacoToken, ISeaportErrors {
 
         uint256 cost = consideration[0].endAmount;
         uint256 beforeBalance = subscriptionPoolToken.balanceOf(tokenWhale);
-        uint256 remainingSubscriptionPool = paco.getSubscriptionPool(
+        uint256 remainingSubscriptionPool = paco.getSubscriptionPoolRemaining(
             whaleTokenId
         );
 

@@ -19,9 +19,8 @@ contract PacoMintTest is TestPacoToken {
         assertEq(ownedTokens.length, 1);
         uint256 mintedTokenId = ownedTokens[0];
         vm.warp(startBlockTimestamp + 5000);
-        uint256 startOnchainSubscriptionPool = paco.getSubscriptionPool(
-            mintedTokenId
-        );
+        uint256 startOnchainSubscriptionPool = paco
+            .getSubscriptionPoolRemaining(mintedTokenId);
         uint256 feeCollected = SafUtils._calculateSafBetweenTimes(
             statedPrice,
             startBlockTimestamp,

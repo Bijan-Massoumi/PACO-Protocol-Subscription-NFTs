@@ -26,7 +26,9 @@ contract PacoAlterSubscriptionPoolTest is
         paco.mint(1, statedPrice, subscriptionPool);
         uint256[] memory ownedTokens = paco.getTokenIdsForAddress(tokenWhale);
         mintedTokenId = ownedTokens[0];
-        startOnchainSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        startOnchainSubscriptionPool = paco.getSubscriptionPoolRemaining(
+            mintedTokenId
+        );
         startOnchainPrice = paco.getPrice(mintedTokenId);
     }
 
@@ -34,7 +36,9 @@ contract PacoAlterSubscriptionPoolTest is
         uint256 prevBalance = subscriptionPoolToken.balanceOf(tokenWhale);
         vm.prank(tokenWhale);
         paco.increaseSubscriptionPool(mintedTokenId, oneETH * 2);
-        uint256 newSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        uint256 newSubscriptionPool = paco.getSubscriptionPoolRemaining(
+            mintedTokenId
+        );
         uint256 newBalance = subscriptionPoolToken.balanceOf(tokenWhale);
         assertEq(
             newSubscriptionPool,
@@ -47,7 +51,9 @@ contract PacoAlterSubscriptionPoolTest is
         uint256 beforeBalance = subscriptionPoolToken.balanceOf(tokenWhale);
         vm.prank(tokenWhale);
         paco.decreaseSubscriptionPool(mintedTokenId, oneETH);
-        uint256 newSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        uint256 newSubscriptionPool = paco.getSubscriptionPoolRemaining(
+            mintedTokenId
+        );
         uint256 afterBalance = subscriptionPoolToken.balanceOf(tokenWhale);
         assertEq(newSubscriptionPool, startOnchainSubscriptionPool - oneETH);
         assertEq(afterBalance, beforeBalance + oneETH);
@@ -84,7 +90,9 @@ contract PacoAlterSubscriptionPoolTest is
             int256(oneETH),
             int256(oneETH * 2)
         );
-        uint256 newSubscriptionPool = paco.getSubscriptionPool(mintedTokenId);
+        uint256 newSubscriptionPool = paco.getSubscriptionPoolRemaining(
+            mintedTokenId
+        );
         uint256 newPrice = paco.getPrice(mintedTokenId);
         assertEq(newPrice, startOnchainPrice + oneETH);
         assertEq(

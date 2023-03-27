@@ -31,14 +31,12 @@ abstract contract PacoToken is
     uint256 creatorFees;
     IERC20 subscriptionPoolToken;
     address withdrawAddress;
-    //  If the token is being liquidated, the stated price will halve every halfLife period of time
-    uint256 halfLife = 2 days;
 
     constructor(
         address _erc20Address,
         address _withdrawAddress,
-        uint256 _selfAssessmentRate
-    ) Ownable() SubscriptionPoolTracker(_selfAssessmentRate) {
+        uint256 _subscriptionRate
+    ) Ownable() SubscriptionPoolTracker(2 days, _subscriptionRate) {
         subscriptionPoolToken = IERC20(_erc20Address);
         withdrawAddress = _withdrawAddress;
     }
@@ -51,8 +49,11 @@ abstract contract PacoToken is
         uint256 subscriptionPoolAmount
     ) external virtual override {
         if (ownerOf(tokenId) == _msgSender()) revert ClaimingOwnNFT();
+        if (!_exists(tokenId)) revert TokenDoesntExist();
         _buyToken(tokenId, newPrice, subscriptionPoolAmount);
     }
+
+    // Price Adjusting Functions -----------------------------------------------
 
     function alterStatedPriceAndSubscriptionPool(
         uint256 tokenId,
@@ -69,40 +70,40 @@ abstract contract PacoToken is
         );
     }
 
-    function increaseSubscriptionPool(uint256 tokenId, uint256 amount)
-        external
-        override
-    {
+    function increaseSubscriptionPool(
+        uint256 tokenId,
+        uint256 amount
+    ) external override {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
         _alterStatedPriceAndSubscriptionPool(tokenId, int256(amount), 0);
     }
 
-    function decreaseSubscriptionPool(uint256 tokenId, uint256 amount)
-        external
-        override
-    {
+    function decreaseSubscriptionPool(
+        uint256 tokenId,
+        uint256 amount
+    ) external override {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
         _alterStatedPriceAndSubscriptionPool(tokenId, -int256(amount), 0);
     }
 
-    function increaseStatedPrice(uint256 tokenId, uint256 amount)
-        external
-        override
-    {
+    function increaseStatedPrice(
+        uint256 tokenId,
+        uint256 amount
+    ) external override {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
         _alterStatedPriceAndSubscriptionPool(tokenId, 0, int256(amount));
     }
 
-    function decreaseStatedPrice(uint256 tokenId, uint256 amount)
-        external
-        override
-    {
+    function decreaseStatedPrice(
+        uint256 tokenId,
+        uint256 amount
+    ) external override {
         if (!_isApprovedOrOwner(msg.sender, tokenId))
             revert IsNotApprovedOrOwner();
 
@@ -114,29 +115,18 @@ abstract contract PacoToken is
         withdrawAccumulatedFees();
     }
 
-    function getSubscriptionPool(uint256 tokenId)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        if (!_exists(tokenId)) revert TokenDoesntExist();
-        uint256 subscriptionPoolRemaining;
-        (
-            subscriptionPoolRemaining,
-            ,
+    // Paco paramter getters and setters ---------------------------------------
 
-        ) = _getCurrentSubscriptionPoolInfoForToken(
-            _subscriptionPoolInfosAtLastCheckpoint[tokenId]
-        );
-
-        return subscriptionPoolRemaining;
+    function getSubscriptionRate() public view returns (uint256) {
+        return subscriptionRate;
     }
 
-    function setSelfAssessmentRate(uint256 newSubscriptionRate)
-        external
-        onlyOwner
-    {
+    function setSubscriptionRate(
+        uint256 newSubscriptionRate
+    ) external onlyOwner {
+        if (newSubscriptionRate > maxSubscriptionRate) {
+            revert InvalidAssessmentFee();
+        }
         if (newSubscriptionRate > maxSubscriptionRate) {
             revert InvalidAssessmentFee();
         }
@@ -145,61 +135,68 @@ abstract contract PacoToken is
         emit NewSubscriptionRateSet(newSubscriptionRate);
     }
 
-    function setMinimumSubscriptionPool(uint256 newMinimumPoolRatio)
-        external
-        onlyOwner
-    {
-        _setMinimumSubscriptionPool(newMinimumPoolRatio);
+    function getMinimumPoolRatio() public view returns (uint256) {
+        return minimumPoolRatio;
     }
 
-    function setHalfLife(uint16 newHalfLife) external onlyOwner {
-        halfLife = newHalfLife;
-    }
-
-    function getPrice(uint256 tokenId)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        if (!_exists(tokenId)) revert TokenDoesntExist();
-
-        uint256 liquidationStartedAt;
-        SubscriptionPoolInfo
-            memory subscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
-                tokenId
-            ];
-        (, , liquidationStartedAt) = _getCurrentSubscriptionPoolInfoForToken(
-            subscriptionPoolInfo
-        );
-        if (liquidationStartedAt != 0) {
-            return
-                SafUtils.getLiquidationPrice(
-                    subscriptionPoolInfo.statedPrice,
-                    block.timestamp - liquidationStartedAt,
-                    halfLife
-                );
-        } else {
-            return subscriptionPoolInfo.statedPrice;
+    function setMinimumPoolRatio(
+        uint256 newMinimumPoolRatio
+    ) external onlyOwner {
+        if (newMinimumPoolRatio > maxMinimumPoolRatio) {
+            revert InvalidMininumBond();
         }
+
+        _setMinimumPoolRatio(newMinimumPoolRatio);
+        emit NewMinimumPoolRatioSet(newMinimumPoolRatio);
     }
 
-    function getStatedPrice(uint256 _tokenId)
-        external
-        view
-        override
-        returns (uint256)
-    {
-        return _subscriptionPoolInfosAtLastCheckpoint[_tokenId].statedPrice;
+    function getHalfLife() public view returns (uint256) {
+        return halfLife;
     }
 
+    function setHalfLife(uint256 newHalflife) external onlyOwner {
+        _setHalfLife(newHalflife);
+    }
+
+    // Token Info Getters ------------------------------------------------------
+
+    function getSubscriptionPoolRemaining(
+        uint256 tokenId
+    ) external view override returns (uint256) {
+        if (!_exists(tokenId)) revert TokenDoesntExist();
+        uint256 subscriptionPoolRemaining = _getSubscriptionPoolRemaining(
+            tokenId
+        );
+
+        return subscriptionPoolRemaining;
+    }
+
+    function getPrice(
+        uint256 tokenId
+    ) external view override returns (uint256) {
+        if (!_exists(tokenId)) revert TokenDoesntExist();
+        return _getPrice(tokenId);
+    }
+
+    function getStatedPrice(
+        uint256 _tokenId
+    ) external view override returns (uint256) {
+        return _getStatedPrice(_tokenId);
+    }
+
+    // burn
     function burnToken(uint256 tokenId) external {
         if (ownerOf(tokenId) != msg.sender) revert IsNotOwner();
-
         _burnToken(tokenId);
     }
 
     // Public functions ------------------------------------------------------
+
+    function getLiquidationStartedAt(
+        uint256 tokenId
+    ) public view returns (uint256) {
+        return _getLiquidationStartedAt(tokenId);
+    }
 
     function isBeingLiquidated(uint256 tokenId) public view returns (bool) {
         uint256 liquidationStartedAt = getLiquidationStartedAt(tokenId);
@@ -208,29 +205,9 @@ abstract contract PacoToken is
 
     function reapSafForTokenIds(uint256[] calldata tokenIds) public {
         uint256 netFees = 0;
-        uint256 feesToReap;
-        uint256 subscriptionPoolRemaining;
-        uint256 liquidationStartedAt;
         for (uint256 i = 0; i < tokenIds.length; i++) {
             if (!_exists(tokenIds[i])) revert TokenDoesntExist();
-
-            SubscriptionPoolInfo
-                storage currSubscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
-                    tokenIds[i]
-                ];
-            (
-                subscriptionPoolRemaining,
-                feesToReap,
-                liquidationStartedAt
-            ) = _getCurrentSubscriptionPoolInfoForToken(
-                currSubscriptionPoolInfo
-            );
-            currSubscriptionPoolInfo
-                .subscriptionPoolRemaining = subscriptionPoolRemaining;
-            currSubscriptionPoolInfo.lastModifiedAt = block.timestamp;
-            currSubscriptionPoolInfo
-                .liquidationStartedAt = liquidationStartedAt;
-            netFees += feesToReap;
+            netFees += _getFeesToCollectForToken(tokenIds[i]);
         }
         creatorFees += netFees;
     }
@@ -240,23 +217,16 @@ abstract contract PacoToken is
         creatorFees = 0;
     }
 
-    function balanceOf(address owner)
-        public
-        view
-        override
-        returns (uint256 balance)
-    {
+    function balanceOf(
+        address owner
+    ) public view override returns (uint256 balance) {
         if (owner == address(0)) revert IsZeroAddress();
         return _balances[owner];
     }
 
-    function ownerOf(uint256 tokenId)
-        public
-        view
-        virtual
-        override
-        returns (address)
-    {
+    function ownerOf(
+        uint256 tokenId
+    ) public view virtual override returns (address) {
         address owner = _owners[tokenId];
         if (owner == address(0)) revert IsZeroAddress();
         return owner;
@@ -280,13 +250,9 @@ abstract contract PacoToken is
     /**
      * @dev See {Paco-getApproved}.
      */
-    function getApproved(uint256 tokenId)
-        public
-        view
-        virtual
-        override
-        returns (address)
-    {
+    function getApproved(
+        uint256 tokenId
+    ) public view virtual override returns (address) {
         require(_exists(tokenId), "Paco: approved query for nonexistent token");
 
         return _tokenApprovals[tokenId];
@@ -362,55 +328,17 @@ abstract contract PacoToken is
         );
     }
 
-    function _getPriceSubscriptionPoolFees(uint256 tokenId)
-        internal
-        view
-        virtual
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
-    {
-        if (!_exists(tokenId)) revert TokenDoesntExist();
-        SubscriptionPoolInfo
-            memory currentOwnersSubscriptionPool = _subscriptionPoolInfosAtLastCheckpoint[
-                tokenId
-            ];
-        uint256 price = currentOwnersSubscriptionPool.statedPrice;
-        uint256 feesToReap;
-        uint256 liquidationStartedAt;
-        uint256 subscriptionPoolRemaining;
-        (
-            subscriptionPoolRemaining,
-            feesToReap,
-            liquidationStartedAt
-        ) = _getCurrentSubscriptionPoolInfoForToken(
-            currentOwnersSubscriptionPool
-        );
-
-        if (liquidationStartedAt != 0) {
-            price = SafUtils.getLiquidationPrice(
-                currentOwnersSubscriptionPool.statedPrice,
-                block.timestamp - liquidationStartedAt,
-                halfLife
-            );
-        }
-
-        return (price, subscriptionPoolRemaining, feesToReap);
-    }
+    // Internal paco parameter change functions -------------------------------
 
     function _approve(address to, uint256 tokenId) internal virtual {
         _tokenApprovals[tokenId] = to;
         emit Approval(ownerOf(tokenId), to, tokenId);
     }
 
-    function _isApprovedOrOwner(address spender, uint256 tokenId)
-        internal
-        view
-        virtual
-        returns (bool)
-    {
+    function _isApprovedOrOwner(
+        address spender,
+        uint256 tokenId
+    ) internal view virtual returns (bool) {
         require(
             _exists(tokenId),
             "ERC721: operator query for nonexistent token"
@@ -459,12 +387,15 @@ abstract contract PacoToken is
         int256 subscriptionPoolDelta,
         int256 priceDelta
     ) internal virtual {
-        SubscriptionPoolInfo
-            storage lastSubscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
-                tokenId
-            ];
-        uint256 feesToReap = _modifySubscriptionPoolInfo(
-            lastSubscriptionPoolInfo,
+        uint256 feesToReap;
+        uint256 newStatedPrice;
+        uint256 newSubscriptionPool;
+        (
+            feesToReap,
+            newStatedPrice,
+            newSubscriptionPool
+        ) = _modifySubscriptionPoolInfo(
+            tokenId,
             subscriptionPoolDelta,
             priceDelta
         );
@@ -472,8 +403,8 @@ abstract contract PacoToken is
 
         emit NewPriceSubscriptionPoolSet(
             tokenId,
-            lastSubscriptionPoolInfo.statedPrice,
-            lastSubscriptionPoolInfo.subscriptionPoolRemaining
+            newStatedPrice,
+            newSubscriptionPool
         );
 
         // if subscriptionPool is increasing, transfer subscriptionPool from owner to contract
@@ -656,10 +587,7 @@ abstract contract PacoToken is
         uint256 tokenId
     ) internal virtual {}
 
-    function _tokenIsAuthorizedForTransfer(uint256 tokenId)
-        internal
-        view
-        virtual
-        returns (bool)
-    {}
+    function _tokenIsAuthorizedForTransfer(
+        uint256 tokenId
+    ) internal view virtual returns (bool) {}
 }

@@ -7,6 +7,8 @@ interface IPacoTokenErrors {
     error ClaimingOwnNFT();
     /// @notice Thrown if sender is not approved or owner
     error IsNotApprovedOrOwner();
+    /// @notice Thrown if bond is more than 100%
+    error InvalidMininumBond();
     /// @notice Thrown if sender is not owner
     error IsNotOwner();
     /// @notice Thrown if sender is setting an eschrow for an owned token

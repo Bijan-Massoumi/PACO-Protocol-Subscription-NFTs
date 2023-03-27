@@ -17,7 +17,7 @@ struct OwnerBalance {
 abstract contract TestSeaportPacoToken is Test {
     PacoSeaportExample paco;
     TestToken subscriptionPoolToken;
-    uint256 oneETH = 10**18;
+    uint256 oneETH = 10 ** 18;
 
     address seaportAddress = 0x00000000006c3852cbEf3e08E8dF289169EdE581;
 
@@ -147,15 +147,15 @@ abstract contract TestSeaportPacoToken is Test {
         return (consideration, consideration.length);
     }
 
-    function getOwnerWithPrevBalances(uint256[] memory tokenIds)
-        public
-        view
-        returns (OwnerBalance[] memory)
-    {
+    function getOwnerWithPrevBalances(
+        uint256[] memory tokenIds
+    ) public view returns (OwnerBalance[] memory) {
         OwnerBalance[] memory ownerBal = new OwnerBalance[](tokenIds.length);
         for (uint256 i = 0; i < tokenIds.length; i++) {
             address tokenOwner = paco.ownerOf(tokenIds[i]);
-            uint256 subscriptionPool = paco.getSubscriptionPool(tokenIds[i]);
+            uint256 subscriptionPool = paco.getSubscriptionPoolRemaining(
+                tokenIds[i]
+            );
             uint256 ownerBalance = subscriptionPoolToken.balanceOf(owner);
             ownerBal[i] = OwnerBalance(
                 ownerBalance,
