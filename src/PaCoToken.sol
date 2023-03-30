@@ -39,6 +39,7 @@ abstract contract PacoToken is
     ) Ownable() SubscriptionPoolTracker(2 days, _subscriptionRate) {
         subscriptionPoolToken = IERC20(_erc20Address);
         withdrawAddress = _withdrawAddress;
+        emit NewSubscriptionRateSet(_subscriptionRate);
     }
 
     // External functions ------------------------------------------------------
