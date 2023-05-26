@@ -116,7 +116,7 @@ abstract contract PacoToken is
         withdrawAccumulatedFees();
     }
 
-    // Paco paramter getters and setters ---------------------------------------
+    // Paco parameter getters and setters ---------------------------------------
 
     function getSubscriptionRate() public view returns (uint256) {
         return subscriptionRate;
@@ -193,14 +193,24 @@ abstract contract PacoToken is
 
     // Public functions ------------------------------------------------------
 
-    function getLiquidationStartedAt(
-        uint256 tokenId
-    ) public view returns (uint256) {
-        return _getLiquidationStartedAt(tokenId);
+    function getLiquidationTime(uint256 tokenId) public view returns (uint256) {
+        SubscriptionPoolInfo
+            memory currentOwnersSubscriptionPool = _subscriptionPoolInfosAtLastCheckpoint[
+                tokenId
+            ];
+
+        uint256 liquidationStartedAt;
+        (, liquidationStartedAt) = _calculateFeesAndLiquidationTime(
+            currentOwnersSubscriptionPool.statedPrice,
+            currentOwnersSubscriptionPool.lastModifiedAt,
+            currentOwnersSubscriptionPool.subscriptionPoolRemaining
+        );
+
+        return liquidationStartedAt;
     }
 
     function isBeingLiquidated(uint256 tokenId) public view returns (bool) {
-        uint256 liquidationStartedAt = getLiquidationStartedAt(tokenId);
+        uint256 liquidationStartedAt = _getLiquidationStartedAt(tokenId);
         return liquidationStartedAt != 0;
     }
 

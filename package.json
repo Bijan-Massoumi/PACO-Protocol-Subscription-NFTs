@@ -1,6 +1,6 @@
 {
   "name": "@bijan-massoumi/paco-protocol",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Hardhat types for the paco protocol",
   "scripts": {
     "test": "forge test --fork-url $RPC -vv ",
