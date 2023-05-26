@@ -19,6 +19,12 @@ struct FeeChangeTimestamp {
 
 abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
     event NewHalfLifeSet(uint256 newHalfLife);
+    event FeeCollected(
+        uint256 tokenId,
+        uint256 feeCollected,
+        uint256 subscriptionPoolRemaining,
+        uint256 liquidationStartedAt
+    );
 
     mapping(uint256 => SubscriptionPoolInfo)
         internal _subscriptionPoolInfosAtLastCheckpoint;
@@ -127,23 +133,35 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
     function _getFeesToCollectForToken(
         uint256 tokenId
     ) internal returns (uint256) {
-        uint256 feesToReap;
+        uint256 feeCollected;
         uint256 subscriptionPoolRemaining;
         uint256 liquidationStartedAt;
         SubscriptionPoolInfo
-            storage currSubscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+            memory currSubscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
                 tokenId
             ];
+
         (
             subscriptionPoolRemaining,
-            feesToReap,
+            feeCollected,
             liquidationStartedAt
         ) = _getCurrentSubscriptionPoolInfoForToken(currSubscriptionPoolInfo);
-        currSubscriptionPoolInfo
-            .subscriptionPoolRemaining = subscriptionPoolRemaining;
-        currSubscriptionPoolInfo.lastModifiedAt = block.timestamp;
-        currSubscriptionPoolInfo.liquidationStartedAt = liquidationStartedAt;
-        return feesToReap;
+
+        _persistNewSubscriptionPoolInfo(
+            tokenId,
+            currSubscriptionPoolInfo.statedPrice,
+            subscriptionPoolRemaining,
+            liquidationStartedAt
+        );
+
+        emit FeeCollected(
+            tokenId,
+            feeCollected,
+            subscriptionPoolRemaining,
+            liquidationStartedAt
+        );
+
+        return feeCollected;
     }
 
     function _getCurrentSubscriptionPoolInfoForToken(
@@ -157,24 +175,29 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             return (0, 0, lastSubscriptionPoolInfo.liquidationStartedAt);
         }
 
-        uint256 feesToReap;
+        uint256 feesToCollect;
         uint256 liquidationStartedAt;
-        (feesToReap, liquidationStartedAt) = _calculateFeesAndLiquidationTime(
+        (
+            feesToCollect,
+            liquidationStartedAt
+        ) = _calculateFeesAndLiquidationTime(
             lastSubscriptionPoolInfo.statedPrice,
             lastSubscriptionPoolInfo.lastModifiedAt,
             lastSubscriptionPoolInfo.subscriptionPoolRemaining
         );
 
-        if (feesToReap > lastSubscriptionPoolInfo.subscriptionPoolRemaining) {
+        if (
+            feesToCollect > lastSubscriptionPoolInfo.subscriptionPoolRemaining
+        ) {
             return (
                 0,
-                feesToReap - lastSubscriptionPoolInfo.subscriptionPoolRemaining,
+                lastSubscriptionPoolInfo.subscriptionPoolRemaining,
                 liquidationStartedAt
             );
         }
         return (
-            lastSubscriptionPoolInfo.subscriptionPoolRemaining - feesToReap,
-            feesToReap,
+            lastSubscriptionPoolInfo.subscriptionPoolRemaining - feesToCollect,
+            feesToCollect,
             lastSubscriptionPoolInfo.liquidationStartedAt
         );
     }
@@ -187,12 +210,12 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
                 tokenId
             ];
         uint256 price = currentOwnersSubscriptionPool.statedPrice;
-        uint256 feesToReap;
+        uint256 feesToCollect;
         uint256 liquidationStartedAt;
         uint256 subscriptionPoolRemaining;
         (
             subscriptionPoolRemaining,
-            feesToReap,
+            feesToCollect,
             liquidationStartedAt
         ) = _getCurrentSubscriptionPoolInfoForToken(
             currentOwnersSubscriptionPool
@@ -205,7 +228,7 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             );
         }
 
-        return (price, subscriptionPoolRemaining, feesToReap);
+        return (price, subscriptionPoolRemaining, feesToCollect);
     }
 
     /*
@@ -272,14 +295,14 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
         return (totalFee, liquidationTime);
     }
 
-    function _modifySubscriptionPoolInfo(
+    function _updateStatedPriceAndSubPool(
         uint256 tokenId,
         int256 subscriptionPoolDelta,
         int256 statedPriceDelta
     )
         internal
         returns (
-            uint256 feesToReap,
+            uint256 feesToCollect,
             uint256 newStatedPrice,
             uint256 newSubscriptionPool
         )
@@ -291,7 +314,7 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
         uint256 subscriptionPoolRemaining;
         (
             subscriptionPoolRemaining,
-            feesToReap,
+            feesToCollect,
 
         ) = _getCurrentSubscriptionPoolInfoForToken(subPoolInfo);
 
@@ -305,26 +328,46 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
         newStatedPrice = uint256(statedPrice);
         newSubscriptionPool = uint256(subPool);
         _persistNewSubscriptionPoolInfo(
-            subPoolInfo,
+            tokenId,
             newStatedPrice,
-            newSubscriptionPool
+            newSubscriptionPool,
+            0
         );
     }
 
     function _persistNewSubscriptionPoolInfo(
-        SubscriptionPoolInfo storage subscriptionPoolInfoRef,
+        uint256 tokenId,
         uint256 newStatedPrice,
-        uint256 newSubscriptionPoolAmount
+        uint256 newSubscriptionPoolAmount,
+        uint256 newLiquidationStartedAt
     ) internal {
         if (
             newSubscriptionPoolAmount <
             (newStatedPrice * minimumPoolRatio) / 10000
         ) revert InsufficientSubscriptionPool();
 
-        subscriptionPoolInfoRef.statedPrice = newStatedPrice;
-        subscriptionPoolInfoRef
-            .subscriptionPoolRemaining = newSubscriptionPoolAmount;
-        subscriptionPoolInfoRef.lastModifiedAt = block.timestamp;
-        subscriptionPoolInfoRef.liquidationStartedAt = 0;
+        SubscriptionPoolInfo
+            storage subscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+                tokenId
+            ];
+
+        if (subscriptionPoolInfo.statedPrice != newStatedPrice) {
+            subscriptionPoolInfo.statedPrice = newStatedPrice;
+        }
+
+        if (
+            subscriptionPoolInfo.subscriptionPoolRemaining !=
+            newSubscriptionPoolAmount
+        ) {
+            subscriptionPoolInfo
+                .subscriptionPoolRemaining = newSubscriptionPoolAmount;
+        }
+
+        if (
+            subscriptionPoolInfo.liquidationStartedAt != newLiquidationStartedAt
+        ) {
+            subscriptionPoolInfo.liquidationStartedAt = newLiquidationStartedAt;
+        }
+        subscriptionPoolInfo.lastModifiedAt = block.timestamp;
     }
 }

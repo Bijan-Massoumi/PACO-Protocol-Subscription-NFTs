@@ -4,7 +4,6 @@ pragma solidity 0.8.18;
 
 import "./PacoToken.sol";
 import "./PacoTokenEnumerable.sol";
-
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract PacoExample is PacoTokenEnumerable, ReentrancyGuard {
@@ -65,12 +64,9 @@ contract PacoExample is PacoTokenEnumerable, ReentrancyGuard {
         }
     }
 
-    function _tokenIsAuthorizedForTransfer(uint256 tokenId)
-        internal
-        view
-        override
-        returns (bool)
-    {
+    function _tokenIsAuthorizedForTransfer(
+        uint256 tokenId
+    ) internal view override returns (bool) {
         return authorizedForTransfer[tokenId];
     }
 }

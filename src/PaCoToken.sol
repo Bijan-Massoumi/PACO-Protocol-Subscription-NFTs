@@ -361,14 +361,11 @@ abstract contract PacoToken is
         _balances[to] += 1;
         _owners[tokenId] = to;
 
-        SubscriptionPoolInfo
-            storage subscriptionPoolInfoRef = _subscriptionPoolInfosAtLastCheckpoint[
-                tokenId
-            ];
         _persistNewSubscriptionPoolInfo(
-            subscriptionPoolInfoRef,
+            tokenId,
             initialStatedPrice,
-            subscriptionPoolAmount
+            subscriptionPoolAmount,
+            0
         );
         subscriptionPoolToken.safeTransferFrom(
             to,
@@ -395,7 +392,7 @@ abstract contract PacoToken is
             feesToReap,
             newStatedPrice,
             newSubscriptionPool
-        ) = _modifySubscriptionPoolInfo(
+        ) = _updateStatedPriceAndSubPool(
             tokenId,
             subscriptionPoolDelta,
             priceDelta
@@ -513,14 +510,11 @@ abstract contract PacoToken is
         uint256 newPrice,
         uint256 subscriptionPoolAmount
     ) internal virtual {
-        SubscriptionPoolInfo
-            storage subscriptionPoolInfoRef = _subscriptionPoolInfosAtLastCheckpoint[
-                tokenId
-            ];
         _persistNewSubscriptionPoolInfo(
-            subscriptionPoolInfoRef,
+            tokenId,
             newPrice,
-            subscriptionPoolAmount
+            subscriptionPoolAmount,
+            0
         );
         emit NewPriceSubscriptionPoolSet(
             tokenId,
