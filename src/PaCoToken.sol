@@ -193,22 +193,6 @@ abstract contract PacoToken is
 
     // Public functions ------------------------------------------------------
 
-    function getLiquidationTime(uint256 tokenId) public view returns (uint256) {
-        SubscriptionPoolInfo
-            memory currentOwnersSubscriptionPool = _subscriptionPoolInfosAtLastCheckpoint[
-                tokenId
-            ];
-
-        uint256 liquidationStartedAt;
-        (, liquidationStartedAt) = _calculateFeesAndLiquidationTime(
-            currentOwnersSubscriptionPool.statedPrice,
-            currentOwnersSubscriptionPool.lastModifiedAt,
-            currentOwnersSubscriptionPool.subscriptionPoolRemaining
-        );
-
-        return liquidationStartedAt;
-    }
-
     function isBeingLiquidated(uint256 tokenId) public view returns (bool) {
         uint256 liquidationStartedAt = _getLiquidationStartedAt(tokenId);
         return liquidationStartedAt != 0;
@@ -442,7 +426,7 @@ abstract contract PacoToken is
         _approve(address(0), _tokenId);
         _balances[owner] -= 1;
         delete _owners[_tokenId];
-        delete _subscriptionPoolInfosAtLastCheckpoint[_tokenId];
+        delete _subscriptionCheckpoints[_tokenId];
         emit Transfer(owner, address(0), _tokenId);
     }
 

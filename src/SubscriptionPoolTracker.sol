@@ -5,7 +5,7 @@ import "./SafUtils.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./ISubscriptionPoolTrackerErrors.sol";
 
-struct SubscriptionPoolInfo {
+struct SubscriptionPoolCheckpoint {
     uint256 statedPrice;
     uint256 subscriptionPoolRemaining;
     uint256 lastModifiedAt;
@@ -26,8 +26,8 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
         uint256 liquidationStartedAt
     );
 
-    mapping(uint256 => SubscriptionPoolInfo)
-        internal _subscriptionPoolInfosAtLastCheckpoint;
+    mapping(uint256 => SubscriptionPoolCheckpoint)
+        internal _subscriptionCheckpoints;
 
     uint256 internal subscriptionRate;
     FeeChangeTimestamp[] feeChangeTimestamps;
@@ -87,45 +87,45 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             ,
 
         ) = _getCurrentSubscriptionPoolInfoForToken(
-            _subscriptionPoolInfosAtLastCheckpoint[tokenId]
+            _subscriptionCheckpoints[tokenId]
         );
         return subscriptionPoolRemaining;
     }
 
     function _getPrice(uint256 tokenId) internal view returns (uint256) {
         uint256 liquidationStartedAt;
-        SubscriptionPoolInfo
-            memory subscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+        SubscriptionPoolCheckpoint
+            memory checkpoint = _subscriptionCheckpoints[
                 tokenId
             ];
         (, , liquidationStartedAt) = _getCurrentSubscriptionPoolInfoForToken(
-            subscriptionPoolInfo
+            checkpoint
         );
         if (liquidationStartedAt != 0) {
             return
                 _getLiquidationPrice(
-                    subscriptionPoolInfo.statedPrice,
+                    checkpoint.statedPrice,
                     liquidationStartedAt
                 );
         } else {
-            return subscriptionPoolInfo.statedPrice;
+            return checkpoint.statedPrice;
         }
     }
 
     function _getStatedPrice(uint256 tokenId) internal view returns (uint256) {
-        return _subscriptionPoolInfosAtLastCheckpoint[tokenId].statedPrice;
+        return _subscriptionCheckpoints[tokenId].statedPrice;
     }
 
     function _getLiquidationStartedAt(
         uint256 tokenId
     ) internal view returns (uint256) {
         uint256 liquidationStartedAt;
-        SubscriptionPoolInfo
-            memory currentOwnersSubscriptionPool = _subscriptionPoolInfosAtLastCheckpoint[
+        SubscriptionPoolCheckpoint
+            memory checkpoint = _subscriptionCheckpoints[
                 tokenId
             ];
         (, , liquidationStartedAt) = _getCurrentSubscriptionPoolInfoForToken(
-            currentOwnersSubscriptionPool
+            checkpoint
         );
         return liquidationStartedAt;
     }
@@ -136,8 +136,8 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
         uint256 feeCollected;
         uint256 subscriptionPoolRemaining;
         uint256 liquidationStartedAt;
-        SubscriptionPoolInfo
-            memory currSubscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+        SubscriptionPoolCheckpoint
+            memory checkpoint = _subscriptionCheckpoints[
                 tokenId
             ];
 
@@ -145,11 +145,11 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             subscriptionPoolRemaining,
             feeCollected,
             liquidationStartedAt
-        ) = _getCurrentSubscriptionPoolInfoForToken(currSubscriptionPoolInfo);
+        ) = _getCurrentSubscriptionPoolInfoForToken(checkpoint);
 
         _persistNewSubscriptionPoolInfo(
             tokenId,
-            currSubscriptionPoolInfo.statedPrice,
+            checkpoint.statedPrice,
             subscriptionPoolRemaining,
             liquidationStartedAt
         );
@@ -165,14 +165,14 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
     }
 
     function _getCurrentSubscriptionPoolInfoForToken(
-        SubscriptionPoolInfo memory lastSubscriptionPoolInfo
+        SubscriptionPoolCheckpoint memory subscriptionCheckpoint
     ) internal view returns (uint256, uint256, uint256) {
         // either they have no tokens or they are being liquidated
         if (
-            lastSubscriptionPoolInfo.subscriptionPoolRemaining == 0 ||
-            lastSubscriptionPoolInfo.liquidationStartedAt != 0
+            subscriptionCheckpoint.subscriptionPoolRemaining == 0 ||
+            subscriptionCheckpoint.liquidationStartedAt != 0
         ) {
-            return (0, 0, lastSubscriptionPoolInfo.liquidationStartedAt);
+            return (0, 0, subscriptionCheckpoint.liquidationStartedAt);
         }
 
         uint256 feesToCollect;
@@ -181,35 +181,26 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             feesToCollect,
             liquidationStartedAt
         ) = _calculateFeesAndLiquidationTime(
-            lastSubscriptionPoolInfo.statedPrice,
-            lastSubscriptionPoolInfo.lastModifiedAt,
-            lastSubscriptionPoolInfo.subscriptionPoolRemaining
+            subscriptionCheckpoint.statedPrice,
+            subscriptionCheckpoint.lastModifiedAt,
+            subscriptionCheckpoint.subscriptionPoolRemaining
         );
 
-        if (
-            feesToCollect > lastSubscriptionPoolInfo.subscriptionPoolRemaining
-        ) {
-            return (
-                0,
-                lastSubscriptionPoolInfo.subscriptionPoolRemaining,
-                liquidationStartedAt
-            );
-        }
         return (
-            lastSubscriptionPoolInfo.subscriptionPoolRemaining - feesToCollect,
+            subscriptionCheckpoint.subscriptionPoolRemaining - feesToCollect,
             feesToCollect,
-            lastSubscriptionPoolInfo.liquidationStartedAt
+            liquidationStartedAt
         );
     }
 
     function _getPriceSubscriptionPoolFees(
         uint256 tokenId
     ) internal view virtual returns (uint256, uint256, uint256) {
-        SubscriptionPoolInfo
-            memory currentOwnersSubscriptionPool = _subscriptionPoolInfosAtLastCheckpoint[
+        SubscriptionPoolCheckpoint
+            memory checkpoint = _subscriptionCheckpoints[
                 tokenId
             ];
-        uint256 price = currentOwnersSubscriptionPool.statedPrice;
+        uint256 price = checkpoint.statedPrice;
         uint256 feesToCollect;
         uint256 liquidationStartedAt;
         uint256 subscriptionPoolRemaining;
@@ -218,12 +209,12 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             feesToCollect,
             liquidationStartedAt
         ) = _getCurrentSubscriptionPoolInfoForToken(
-            currentOwnersSubscriptionPool
+            checkpoint
         );
 
         if (liquidationStartedAt != 0) {
             price = _getLiquidationPrice(
-                currentOwnersSubscriptionPool.statedPrice,
+                checkpoint.statedPrice,
                 liquidationStartedAt
             );
         }
@@ -247,7 +238,6 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
     ) internal view returns (uint256, uint256) {
         uint256 totalFee;
         uint256 prevIntervalFee;
-        uint256 liquidationTime;
         uint256 startTime = lastModifiedAt;
         // iterate through all fee changes that have happened since the last checkpoint
         for (uint256 i = 0; i < feeChangeTimestamps.length; i++) {
@@ -263,13 +253,15 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
                 totalFee += intervalFee;
                 // if the total fee is greater than the subscriptionPool remaining, we know that the subscriptionPool ran out
                 if (totalFee > subscriptionPoolRemaining) {
-                    liquidationTime = SafUtils._getTimeLiquidationBegan(
-                        statedPrice,
-                        startTime,
-                        previousRate,
-                        subscriptionPoolRemaining - prevIntervalFee
+                    return (
+                        subscriptionPoolRemaining,
+                        SafUtils._getTimeLiquidationBegan(
+                            statedPrice,
+                            startTime,
+                            previousRate,
+                            subscriptionPoolRemaining - prevIntervalFee
+                        )
                     );
-                    return (totalFee, liquidationTime);
                 }
                 startTime = feeChangeTimestamp;
                 prevIntervalFee += intervalFee;
@@ -284,15 +276,18 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             subscriptionRate
         );
         if (totalFee > subscriptionPoolRemaining) {
-            liquidationTime = SafUtils._getTimeLiquidationBegan(
-                statedPrice,
-                startTime,
-                subscriptionRate,
-                subscriptionPoolRemaining - prevIntervalFee
+            return (
+                subscriptionPoolRemaining,
+                SafUtils._getTimeLiquidationBegan(
+                    statedPrice,
+                    startTime,
+                    subscriptionRate,
+                    subscriptionPoolRemaining - prevIntervalFee
+                )
             );
         }
 
-        return (totalFee, liquidationTime);
+        return (totalFee, 0);
     }
 
     function _updateStatedPriceAndSubPool(
@@ -307,8 +302,8 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             uint256 newSubscriptionPool
         )
     {
-        SubscriptionPoolInfo
-            storage subPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+        SubscriptionPoolCheckpoint
+            storage checkpoint = _subscriptionCheckpoints[
                 tokenId
             ];
         uint256 subscriptionPoolRemaining;
@@ -316,12 +311,12 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             subscriptionPoolRemaining,
             feesToCollect,
 
-        ) = _getCurrentSubscriptionPoolInfoForToken(subPoolInfo);
+        ) = _getCurrentSubscriptionPoolInfoForToken(checkpoint);
 
         //  apply deltas to existing pool / price
         int256 subPool = int256(subscriptionPoolRemaining) +
             subscriptionPoolDelta;
-        int256 statedPrice = int256(subPoolInfo.statedPrice) + statedPriceDelta;
+        int256 statedPrice = int256(checkpoint.statedPrice) + statedPriceDelta;
         if (statedPrice < 0) revert InvalidAlterPriceValue();
         if (subPool < 0) revert InvalidAlterSubscriptionPoolValue();
 
@@ -346,28 +341,28 @@ abstract contract SubscriptionPoolTracker is ISubscriptionPoolTrackerErrors {
             (newStatedPrice * minimumPoolRatio) / 10000
         ) revert InsufficientSubscriptionPool();
 
-        SubscriptionPoolInfo
-            storage subscriptionPoolInfo = _subscriptionPoolInfosAtLastCheckpoint[
+        SubscriptionPoolCheckpoint
+            storage checkpoint = _subscriptionCheckpoints[
                 tokenId
             ];
 
-        if (subscriptionPoolInfo.statedPrice != newStatedPrice) {
-            subscriptionPoolInfo.statedPrice = newStatedPrice;
+        if (checkpoint.statedPrice != newStatedPrice) {
+            checkpoint.statedPrice = newStatedPrice;
         }
 
         if (
-            subscriptionPoolInfo.subscriptionPoolRemaining !=
+            checkpoint.subscriptionPoolRemaining !=
             newSubscriptionPoolAmount
         ) {
-            subscriptionPoolInfo
+            checkpoint
                 .subscriptionPoolRemaining = newSubscriptionPoolAmount;
         }
 
         if (
-            subscriptionPoolInfo.liquidationStartedAt != newLiquidationStartedAt
+            checkpoint.liquidationStartedAt != newLiquidationStartedAt
         ) {
-            subscriptionPoolInfo.liquidationStartedAt = newLiquidationStartedAt;
+            checkpoint.liquidationStartedAt = newLiquidationStartedAt;
         }
-        subscriptionPoolInfo.lastModifiedAt = block.timestamp;
+        checkpoint.lastModifiedAt = block.timestamp;
     }
 }
