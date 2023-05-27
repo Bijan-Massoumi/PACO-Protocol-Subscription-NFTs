@@ -10,6 +10,7 @@ contract PacoExample is PacoTokenEnumerable, ReentrancyGuard {
     uint256 public constant mintPrice = 1;
     uint256 public constant MAX_SUPPLY = 10000;
 
+    mapping(uint256 => string) private _tokenURIs;
     mapping(uint256 => bool) internal authorizedForTransfer;
 
     // Token name
@@ -62,6 +63,27 @@ contract PacoExample is PacoTokenEnumerable, ReentrancyGuard {
         for (uint256 i = 0; i < numberOfTokens; i++) {
             _mint(sender, index + i, price, subscriptionPool);
         }
+    }
+
+    function setTokenURI(
+        uint256 tokenId,
+        string memory _tokenURI
+    ) external virtual onlyOwner {
+        require(
+            _exists(tokenId),
+            "ERC721Metadata: URI set of nonexistent token"
+        );
+        _tokenURIs[tokenId] = _tokenURI;
+    }
+
+    function tokenURI(
+        uint256 tokenId
+    ) public view virtual returns (string memory) {
+        require(
+            _exists(tokenId),
+            "ERC721Metadata: URI query for nonexistent token"
+        );
+        return _tokenURIs[tokenId];
     }
 
     function _tokenIsAuthorizedForTransfer(
